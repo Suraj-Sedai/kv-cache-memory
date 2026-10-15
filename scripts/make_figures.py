@@ -31,7 +31,11 @@ import pandas as pd  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
-from src.memory_model import ARCH_SWEEP_POOL, pool_correction, predict_slopes  # noqa: E402
+from src.memory_model import allocated_slots, arch_sweep_config, predict_slopes  # noqa: E402
+
+# Activation coefficients for figure 1: "fitted" or "integer". Pending the author's choice;
+# keep in sync with scripts/check_memory_model.py.
+COEFFS = "fitted"
 
 RESULTS = os.path.join(REPO, "results")
 OUT = os.path.join(REPO, "figures")
@@ -66,16 +70,17 @@ def save(fig, stem):
 def figure1():
     print("\n=== fig1_memory_slope <- results/arch_sweep/arch_sweep.json ===")
     arch = json.load(open(os.path.join(RESULTS, "arch_sweep", "arch_sweep.json")))
-    corr = pool_correction(**ARCH_SWEEP_POOL)
-    _, unc = predict_slopes(arch, 1.0)
-    _, cor = predict_slopes(arch, corr)
+    L, D, P = arch_sweep_config()
+    slots = allocated_slots(L, D, P)
+    _, unc = predict_slopes(arch, corrected=False, coeffs=COEFFS)
+    _, cor = predict_slopes(arch, corrected=True, coeffs=COEFFS)
     df = pd.DataFrame({
         "shape": [r["shape"] for r in cor], "held_out": [r["held_out"] for r in cor],
         "measured": [r["measured"] for r in cor],
         "pred_uncorrected": [r["predicted"] for r in unc], "pred_corrected": [r["predicted"] for r in cor],
         "err_uncorrected_pct": [r["error_pct"] for r in unc], "err_corrected_pct": [r["error_pct"] for r in cor],
     }).sort_values("measured").reset_index(drop=True)
-    print(f"  correction {corr * 1024:.0f}/1024")
+    print(f"  cache term over ceil(({L}+{D})/{P})*{P} = {slots} slots per {L} tokens; coefficients {COEFFS}")
     print(df.round(3).to_string(index=False))
 
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(9.2, 3.6), gridspec_kw={"width_ratios": [1, 1.25]})
@@ -100,7 +105,7 @@ def figure1():
     axR.barh(y + h / 2, df.err_uncorrected_pct, height=h - 0.04, color=ORANGE,
              label="uncorrected cache term (2·L·d·2 B)")
     axR.barh(y - h / 2, df.err_corrected_pct, height=h - 0.04, color=BLUE,
-             label="corrected (×1040/1024)")
+             label=f"corrected (×{slots}/{L})")
     axR.axvline(0, color=INK_3, lw=0.8)
     for yi, r in zip(y, df.itertuples()):
         for val, off in ((r.err_uncorrected_pct, h / 2), (r.err_corrected_pct, -h / 2)):
