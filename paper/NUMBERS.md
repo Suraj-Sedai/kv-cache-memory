@@ -29,16 +29,8 @@ every tested shape has d_ff ≥ 2·d_model.
 ## Untraced: 0
 
 Every printed number traces to a committed file. The last two were closed by the GPU runs at
-feb71b7: `results/matmul_peak/matmul_peak.json` (0.7%) and
+feb71b7: `results/matmul_peak/matmul_peak.json` (decode arithmetic 0.03–0.65%) and
 `results/sdpa_backend_check/sdpa_backend_check.json` (32 MB vs 4,888 MB).
-
-Wording notes (not numbers):
-- Lines 51 and 169: 0.7% is FLOPs at the *achievable large-matmul* throughput (50.82 TFLOP/s)
-  divided by the measured TPOT, so it is the share the arithmetic *would* take at that rate. It
-  is the maximum over the precision sweep (0.65% at 1024x32; range 0.03-0.65%; 2048x16 0.41%).
-- Line 179: FlashAttention is unavailable because this PyTorch build was not compiled with it
-  ("Torch was not compiled with flash attention", `sdpa_backend_check` run), not because of the
-  device architecture.
 
 ## Abstract and Introduction (lines 11–29)
 
@@ -68,7 +60,7 @@ Wording notes (not numbers):
 | 45 | 7113 vs 7086 MB | `exp3` / `oom` | 7112.57 / 7086.5 | ok |
 | 47 | 1 timed + 2 warmups, median of 20 | runners | `N_WARMUP = 3`, `N_MEASURE = 20` | ok |
 | 49 | amax/127; 512-token windows; 284,614 tokens | `run_perplexity_eval.py`, `ppl` | `fake_quant_per_token`; `ctx` 512; `n_tokens` | ok |
-| 51 | roughly 0.7% arithmetic | `exp3` + `results/matmul_peak/matmul_peak.json` | decode-step FLOPs / 50.82 TFLOP/s / `tpot_ms`: max 0.65% (1024×32) over 20 FP16 cells | ok; T5 |
+| 51, 169 | 50.8 TFLOP/s; arithmetic 0.03–0.65% of measured decode latency | `results/matmul_peak/matmul_peak.json`; `exp3` | `achievable_tflops` 50.82; decode-step FLOPs / 50.82 TFLOP/s / `tpot_ms` over 20 FP16 cells: 0.03% (1024×1) to 0.65% (1024×32) | ok; T5 |
 
 ## 3. A memory model (lines 55–80)
 
@@ -94,7 +86,8 @@ Wording notes (not numbers):
 |---|---|---|---|---|
 | 90, 95, 103 | 13.3% (13%) of peak before the fix, 2048×16 | `exp3-pre` | `paged_fp16` 528.0 / 3958.11 | ok; T6 |
 | 90 | 50.8–58.0%; INT8 saves 22.8–26.0% | `exp3` | 2048×16, 8192×32 | ok; T1 |
-| 91, 97 | 4.920 → 23.228 ms (batch 1 → 16, seq 128); 4.920 → 5.093 ms (seq 128 → 2048, batch 1) | `exp1-pre` | paged `tpot_ms` | ok |
+| 91, 97 | 4.920 → 23.228 ms (batch 1 → 16, seq 128); 4.920 → 5.093 ms (seq 128 → 2048, batch 1) | `exp1-pre` | paged `tpot_ms` | ok; T9 |
+| 91, 97 | batch effect 4.7×; largest unpaired drift 1.76× | `exp1-pre`; `exp1` + `results/paired_layout_check/paired_layout_check.json` | 23.228 / 4.920 = 4.72; 2048×1: interleaved median 0.6524 / unpaired 0.3715 = 1.76 | ok; T9 |
 | 97 | 32× cache operations at batch 32 | derived | batch × n_layers vs n_layers | derived |
 | 92, 99, 153 | reservation waste 0.0 | `exp1` | contiguous `frag_ratio` 0.0 in all 20 rows | ok |
 | 93, 101 | 14,008.6 MB on a 12,226.6 MB card | `wddm` | FP16 8192×64 `peak_allocated_mb`; `meta.physical_memory_mb` | ok |
@@ -123,6 +116,7 @@ Wording notes (not numbers):
 | 131 | 1538k / 2097k (40 GB); 3083k / 4202k (80 GB) | derived from the fits | 1,538,378 / 2,096,586; 3,083,091 / 4,201,602 | ok (extrapolation) |
 | 135 | 89.6–93.4%, median 92.5% (19 cells); batch 1 89.6–91.5%; batch ≥ 8 90.9–93.4% | `exp3` | Δ`peak_memory_mb` / Δ`cache_memory_mb`, excluding 512×1 | ok |
 | 135 | 512×1: 4.57 MB vs 4.36 MB, above 100% | `exp3` | 171.88 − 167.31; 9.0 − 4.64 (the INT8 peak reruns at 168.31, within the 1 MB tolerance) | ok |
+| 139 | paged/contiguous throughput median 0.58–0.65 (512×1, 2048×1, 2048×16; 5 interleaved pairs each; paged slower in 15/15) | `results/paired_layout_check/paired_layout_check.json` | `cells[].median_ratio` 0.5894, 0.6524, 0.5838; `pairs[].ratio` all < 1 | ok; T9 |
 | 139 | paged/contiguous peak within 1% | `exp1` | max 0.9% | ok; T4 |
 | 143 | 98.54% / 98.83%; +0.002% / +0.006%; ~1.5% flips; 284,614 | `ppl` | rows 1–2 `top1_agreement`, `ppl_pct_increase`, `n_tokens` | ok; T3 |
 | 145, 167 | 355M parameters | GPT-2-medium | | external |
@@ -132,7 +126,7 @@ Wording notes (not numbers):
 | Line | Number | Source | Key / row / column | Status |
 |---|---|---|---|---|
 | 151 | blocks of 8–16 favored | `results/pre_fix/exp2_block_size_sweep_13fbfae.csv` | blocks 8 and 16 win all 15 (seq_len, batch) cells; mean 314.4 / 326.6 vs 258.3 / 181.1 tok/s | ok; T8 |
-| 155 | 20 cells, seq 128–2048, batch 1–16; 0.9% | `exp1` | | ok; T4 |
+| 155 | 20 cells, seq 128–2048, batch 1–16; paged slower in all 20 unpaired cells and all 15 interleaved pairs; 0.9% | `exp1`; `results/paired_layout_check/paired_layout_check.json` | | ok; T4, T9 |
 | 157 | 58% | `exp3` | 8192×32 | ok |
 
 ## 7. Limitations and 8. Related work (lines 161–185)
@@ -140,10 +134,10 @@ Wording notes (not numbers):
 | Line | Number | Source | Key / row / column | Status |
 |---|---|---|---|---|
 | 165 | 11.9 GB | `wddm` | | ok |
-| 169 | roughly 0.7% arithmetic | as line 51 | | ok; T5 |
 | 169 | same commit, 1.18× throughput | `results/block_size_sweep/noise_check.json` | `max_over_min` 1.182 (1456.6 vs 1232.3) | ok |
 | 175 | 133 systems papers | [13] | | external |
 | 177 | vLLM default block size 16 | [10] | | external |
+| 179 | FlashAttention unavailable in this PyTorch build | `results/sdpa_backend_check/sdpa_backend_check.json` | FLASH_ATTENTION `available` false, "No available kernel"; run warning "Torch was not compiled with flash attention" | ok |
 | 183 | 2.7% or 26% | `exp3` | | ok |
 | 185 | "roughly 1.2 times model memory" | [2] | | external |
 | 185 | 11.01, 11.00, 11.04 KB at 4/8/16 layers; 0.08% | `arch` | | ok; CMM |
@@ -152,5 +146,5 @@ Wording notes (not numbers):
 
 | Item | Status |
 |---|---|
-| §5.4 paged throughput range (left out of the draft) | `exp1` gives paged/contiguous 0.32–0.77× (T4), from separate sweeps (`run_cache_comparison.py:165` loops cache_type outermost). Interleaved ABAB ×5 (`results/paired_layout_check/paired_layout_check.json`), median (range): 512×1 0.589 (0.556–0.739), 2048×1 0.652 (0.618–0.716), 2048×16 0.584 (0.447–0.592). exp1 at the same cells: 0.459, 0.372, 0.658 |
+| exp1's unpaired paged/contiguous range 0.32–0.77× | Not printed. The paper uses the interleaved check instead (line 139); exp1's per-cell ratios differ from it by up to 1.76× (T9) |
 | Editor's note "exp1 reports 1.35–2.3×" | no committed file gives it |
