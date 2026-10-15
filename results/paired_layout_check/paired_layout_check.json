@@ -1,0 +1,132 @@
+{
+  "reps": 5,
+  "runs_per_block": 3,
+  "warmup": 3,
+  "seed": 0,
+  "decode_len": 60,
+  "cells": [
+    {
+      "seq_len": 512,
+      "batch": 1,
+      "order": "ABAB (A=contiguous, B=paged)",
+      "pairs": [
+        {
+          "rep": 1,
+          "contiguous_tps": 261.2,
+          "paged_tps": 192.9,
+          "ratio": 0.7386
+        },
+        {
+          "rep": 2,
+          "contiguous_tps": 273.0,
+          "paged_tps": 160.9,
+          "ratio": 0.5894
+        },
+        {
+          "rep": 3,
+          "contiguous_tps": 297.4,
+          "paged_tps": 173.8,
+          "ratio": 0.5844
+        },
+        {
+          "rep": 4,
+          "contiguous_tps": 311.7,
+          "paged_tps": 173.3,
+          "ratio": 0.556
+        },
+        {
+          "rep": 5,
+          "contiguous_tps": 195.1,
+          "paged_tps": 125.0,
+          "ratio": 0.6408
+        }
+      ],
+      "median_ratio": 0.5894,
+      "min_ratio": 0.556,
+      "max_ratio": 0.7386,
+      "spread_max_over_min": 1.328
+    },
+    {
+      "seq_len": 2048,
+      "batch": 1,
+      "order": "ABAB (A=contiguous, B=paged)",
+      "pairs": [
+        {
+          "rep": 1,
+          "contiguous_tps": 319.1,
+          "paged_tps": 211.1,
+          "ratio": 0.6615
+        },
+        {
+          "rep": 2,
+          "contiguous_tps": 308.8,
+          "paged_tps": 221.0,
+          "ratio": 0.7157
+        },
+        {
+          "rep": 3,
+          "contiguous_tps": 292.7,
+          "paged_tps": 181.0,
+          "ratio": 0.6184
+        },
+        {
+          "rep": 4,
+          "contiguous_tps": 207.2,
+          "paged_tps": 128.7,
+          "ratio": 0.621
+        },
+        {
+          "rep": 5,
+          "contiguous_tps": 193.3,
+          "paged_tps": 126.1,
+          "ratio": 0.6524
+        }
+      ],
+      "median_ratio": 0.6524,
+      "min_ratio": 0.6184,
+      "max_ratio": 0.7157,
+      "spread_max_over_min": 1.157
+    },
+    {
+      "seq_len": 2048,
+      "batch": 16,
+      "order": "ABAB (A=contiguous, B=paged)",
+      "pairs": [
+        {
+          "rep": 1,
+          "contiguous_tps": 2547.8,
+          "paged_tps": 1487.5,
+          "ratio": 0.5838
+        },
+        {
+          "rep": 2,
+          "contiguous_tps": 2509.1,
+          "paged_tps": 1484.8,
+          "ratio": 0.5918
+        },
+        {
+          "rep": 3,
+          "contiguous_tps": 2535.8,
+          "paged_tps": 1488.4,
+          "ratio": 0.587
+        },
+        {
+          "rep": 4,
+          "contiguous_tps": 2672.6,
+          "paged_tps": 1552.5,
+          "ratio": 0.5809
+        },
+        {
+          "rep": 5,
+          "contiguous_tps": 3394.9,
+          "paged_tps": 1516.8,
+          "ratio": 0.4468
+        }
+      ],
+      "median_ratio": 0.5838,
+      "min_ratio": 0.4468,
+      "max_ratio": 0.5918,
+      "spread_max_over_min": 1.325
+    }
+  ]
+}
