@@ -100,6 +100,8 @@ Install PyTorch with CUDA first ([pytorch.org](https://pytorch.org/get-started/l
 | INT8 perplexity (one row per call; appends) | `python -m experiments.run_perplexity_eval --model gpt2 --text data/wikitext2_test.txt` | `results/perplexity_eval/exp3_perplexity.csv` |
 | Driver spill, no memory cap | `python -m experiments.wddm_spill` | `results/pre_fix/wddm_spill.json` |
 | Block-size noise, same commit | `python -m experiments.block_size_noise` | `results/block_size_sweep/noise_check.json` |
+| Attention workspace per SDPA backend | `python -m experiments.sdpa_backend_check` | `results/sdpa_backend_check/sdpa_backend_check.json` |
+| Activation tensors live at peak | `python -m experiments.activation_census` | `results/activation_census/activation_census.json` |
 
 Use `--help` on any runner to select a subset of the grid (for example `--seq-lens 512 --batches 1`).
 
