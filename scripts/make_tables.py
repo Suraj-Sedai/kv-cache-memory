@@ -4,7 +4,7 @@
   table 2  FP16 / INT8 per-token fits, tokens that fit in 8 GB (same file; notebook 04's fit)
   table 3  INT8 perplexity cost on real GPT-2 weights      <- results/perplexity_eval/exp3_perplexity.csv
   table 4  paged / contiguous throughput range             <- results/cache_comparison/exp1_layout_comparison.csv
-  table 5  decode-step FLOPs and arithmetic share of TPOT  <- results/precision_sweep (+ --peak-tflops)
+  table 5  decode-step FLOPs and arithmetic share of TPOT  <- results/precision_sweep, results/matmul_peak
   table 6  pre-fix ledger at 2048x16 and across the grid  <- results/pre_fix/exp3_precision_sweep_e383030.csv
   table 7  effective ceiling below each enforced budget    <- results/oom_frontier, results/pre_fix/wddm_spill.json
 
@@ -92,11 +92,12 @@ def decode_step_flops(n_layers, d_model, d_ff, vocab, batch, context):
     return batch * per_seq
 
 
-def table5(peak_tflops=None):
-    """Arithmetic share of a decode step = FLOPs / device throughput / measured TPOT.
+def table5():
+    """Arithmetic share of a decode step = FLOPs / achievable FP16 throughput / measured TPOT.
 
-    Every input except the device's FP16 throughput is in committed files. The throughput is
-    not measured or recorded anywhere in results/, so it must be passed as --peak-tflops.
+    Throughput comes from results/matmul_peak/matmul_peak.json (python -m experiments.matmul_peak);
+    every other input is in committed files. Reported per cell, with the maximum over the sweep
+    (an upper bound for "at this model size") and the 2048x16 cell used throughout section 4.
     """
     d = pd.read_csv(os.path.join(R, "precision_sweep", "exp3_precision_sweep.csv"))
     d = d[(d.status == "ok") & (d.cache_type == "paged_fp16")].copy()
@@ -106,14 +107,19 @@ def table5(peak_tflops=None):
                            for r in d.itertuples()]
     print("Table 5: decode-step arithmetic (FP16 paged, precision sweep)")
     cols = ["seq_len", "batch", "tpot_ms", "gflop_per_step"]
-    if peak_tflops:
-        d["arith_ms"] = d.gflop_per_step / (peak_tflops * 1e3)
+    peak_path = os.path.join(R, "matmul_peak", "matmul_peak.json")
+    if os.path.exists(peak_path):
+        tflops = json.load(open(peak_path))["achievable_tflops"]
+        d["arith_ms"] = d.gflop_per_step / (tflops * 1e3)
         d["arith_pct_of_tpot"] = 100 * d.arith_ms / d.tpot_ms
         cols += ["arith_ms", "arith_pct_of_tpot"]
-        print(f"  at {peak_tflops:g} TFLOP/s: arithmetic is {d.arith_pct_of_tpot.min():.2f}-"
-              f"{d.arith_pct_of_tpot.max():.2f}% of TPOT across cells")
+        top = d.loc[d.arith_pct_of_tpot.idxmax()]
+        ref = d[(d.seq_len == 2048) & (d.batch == 16)].iloc[0]
+        print(f"  achievable FP16 {tflops:g} TFLOP/s ({os.path.relpath(peak_path, REPO)}): arithmetic is "
+              f"{d.arith_pct_of_tpot.min():.2f}-{d.arith_pct_of_tpot.max():.2f}% of TPOT; max at "
+              f"{int(top.seq_len)}x{int(top.batch)}; 2048x16: {ref.arith_pct_of_tpot:.2f}%")
     else:
-        print("  device FP16 throughput not in committed results: pass --peak-tflops to get the share")
+        print("  results/matmul_peak/matmul_peak.json not found: run python -m experiments.matmul_peak")
     print(d[cols].round(4).to_string(index=False))
 
 
@@ -247,14 +253,12 @@ def compare(path):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Print the paper tables from committed results.")
     ap.add_argument("--against", nargs="*", default=[], help="rerun CSV(s) to compare with the committed ones")
-    ap.add_argument("--peak-tflops", type=float, default=None,
-                    help="device FP16 throughput for Table 5 (not in committed results)")
     args = ap.parse_args()
     table1_2()
     table3()
     table4()
     print()
-    table5(args.peak_tflops)
+    table5()
     print()
     table6()
     print()

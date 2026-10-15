@@ -102,6 +102,8 @@ Install PyTorch with CUDA first ([pytorch.org](https://pytorch.org/get-started/l
 | Block-size noise, same commit | `python -m experiments.block_size_noise` | `results/block_size_sweep/noise_check.json` |
 | Attention workspace per SDPA backend | `python -m experiments.sdpa_backend_check` | `results/sdpa_backend_check/sdpa_backend_check.json` |
 | Activation tensors live at peak | `python -m experiments.activation_census` | `results/activation_census/activation_census.json` |
+| Achievable FP16 matmul throughput | `python -m experiments.matmul_peak` | `results/matmul_peak/matmul_peak.json` |
+| Paged vs contiguous, interleaved ABAB | `python -m experiments.paired_layout_check` | `results/paired_layout_check/paired_layout_check.json` |
 
 Use `--help` on any runner to select a subset of the grid (for example `--seq-lens 512 --batches 1`).
 
