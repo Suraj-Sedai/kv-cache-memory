@@ -193,7 +193,9 @@ def table8():
             d = d[d.status == "ok"]
         wins = d.loc[d.groupby(["seq_len", "batch"]).throughput.idxmax()].block_size.value_counts().sort_index()
         mean = d.groupby("block_size").throughput.mean().round(1)
-        print(f"  {name}: cells won {dict(wins)} of {wins.sum()}; mean tok/s by block {dict(mean)}")
+        won = {int(k): int(v) for k, v in wins.items()}
+        avg = {int(k): float(v) for k, v in mean.items()}
+        print(f"  {name}: cells won {won} of {sum(won.values())}; mean tok/s by block {avg}")
 
 
 def table4():
