@@ -66,6 +66,7 @@ figures/             written only by scripts/make_figures.py
 notebooks/           04 memory model and OOM frontier, 05 architecture sweep
 data/                WikiText-2 test set, short eval text
 tests/               56 tests; paged and contiguous must produce identical tokens
+paper/NUMBERS.md     every number in the paper traced to its results file and key/row/column
 ```
 
 ## Reproduce
