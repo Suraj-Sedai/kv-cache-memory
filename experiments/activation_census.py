@@ -12,9 +12,14 @@ At that instant, five per-token tensors are live:
   d_ff     fc1 output             mlp.py:21
   d_ff     GELU output            mlp.py:22
 
-The attention phase holds at most 7 * d_model (block input, ln1 output, q, k, v and the paged
-read's k and v; attention.py:47-53). That is <= 3 * d_model + 2 * d_ff whenever d_ff >= 2 * d_model,
-which holds for every shape swept.
+The attention phase holds 7 d_model-wide tensors at two points, both probed here:
+  after the paged read (attention.py:53): block input (model.py:29), ln1 output
+    (transformer_block.py:27), q, k, v (attention.py:47-49), and the read's k and v (:53,
+    gathered by PagedKVCache.read, paged.py:69-74)
+  at out_proj (attention.py:70): block input, ln1 output, q and the read's k and v (still bound
+    as locals), the contiguous attention output (:69), and the out_proj output (:70)
+So the activation term is max(7 * d_model, 3 * d_model + 2 * d_ff). Every shape swept has
+d_ff >= 2 * d_model, where the GELU branch is the larger (equal at 8L/1024d/2048ff).
 
 For each shape this wraps GELU, counts the live CUDA storages of size B*T*d_model and B*T*d_ff
 at that instant (gc census), and compares memory there with the forward's global peak and with
@@ -86,6 +91,29 @@ def run_shape(L, d, H, ff, B, seed, probe=True):
 
     for blk in model.layers:
         blk.mlp.activation = gelu_probe
+
+    # Attention-phase probes, layer 0 of the prefill: right after the paged read returns
+    # (attention.py:53, the projected k and v are still referenced by the caller) and at the
+    # out_proj output (attention.py:70, its input is the contiguous attention output from :69).
+    attn = {}
+    read = cache.read
+
+    def read_probe(layer_idx):
+        out = read(layer_idx)
+        if probe and layer_idx == 0 and "read" not in attn and out[0].size(2) == SEQ_LEN:
+            torch.cuda.synchronize()
+            attn["read"] = ((torch.cuda.memory_allocated() - base) / MB,
+                            census(B * SEQ_LEN * d, B * SEQ_LEN * ff)["d_model"])
+        return out
+
+    def out_proj_probe(module, inputs, output):
+        if probe and "out_proj" not in attn and output.size(1) == SEQ_LEN:
+            torch.cuda.synchronize()
+            attn["out_proj"] = ((torch.cuda.memory_allocated() - base) / MB,
+                                census(B * SEQ_LEN * d, B * SEQ_LEN * ff)["d_model"])
+
+    cache.read = read_probe
+    model.layers[0].attention.out_proj.register_forward_hook(out_proj_probe)
     with torch.no_grad():
         logits = model(ids, kv_cache=cache, use_cache=True, start_pos=0)
         cache.advance(SEQ_LEN)
@@ -104,7 +132,12 @@ def run_shape(L, d, H, ff, B, seed, probe=True):
                 live_d_ff_tensors=seen.get("counts", {}).get("d_ff"),
                 mb_at_gelu=round(seen.get("mb", float("nan")), 2),
                 forward_peak_mb=round(peak, 2),
-                predicted_mb=round((3 * d + 2 * ff) * 2 * tokens / MB, 2))
+                predicted_mb=round((3 * d + 2 * ff) * 2 * tokens / MB, 2),
+                attn_read_d_model_tensors=attn.get("read", (None, None))[1],
+                attn_read_mb=round(attn.get("read", (float("nan"),))[0], 2),
+                attn_out_proj_d_model_tensors=attn.get("out_proj", (None, None))[1],
+                attn_out_proj_mb=round(attn.get("out_proj", (float("nan"),))[0], 2),
+                attn_predicted_mb=round(7 * d * 2 * tokens / MB, 2))
 
 
 def main():
@@ -123,6 +156,8 @@ def main():
         print(r)
     ok = all(r["live_d_model_tensors"] == 3 and r["live_d_ff_tensors"] == 2 for r in rows)
     print(f"\n3 d_model + 2 d_ff tensors live at the GELU in every shape: {ok}")
+    ok7 = all(r["attn_read_d_model_tensors"] == 7 and r["attn_out_proj_d_model_tensors"] == 7 for r in rows)
+    print(f"7 d_model tensors live at the attention read and at out_proj in every shape: {ok7}")
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     with open(args.output, "w") as f:
         json.dump(rows, f, indent=2)

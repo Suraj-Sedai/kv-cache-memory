@@ -18,6 +18,11 @@ how the harness sizes the pool and what it counts as a token, not an extra per-t
 Other runners use other (L, D) (run_precision_sweep.py: D = 60, five values of L), so the
 ratio must be recomputed per configuration, never copied.
 
+SCOPE: the activation term is max(7 * d_model, 3 * d_model + 2 * d_ff) elements per token: 7 d_model-wide
+tensors at the attention read / out_proj (attention.py:53, :70), 3 d_model + 2 d_ff at the GELU
+(mlp.py:22). All tested shapes have d_ff >= 2 * d_model, so the GELU branch applies (a tie at
+8L/1024d/2048ff). Counted on the GPU by experiments/activation_census.py.
+
 ACTIVATION TERM. activation KB/token = (a * d_model + b * d_ff) * bytes_per_elem / 1024 (+ c0).
 Two coefficient sets are available:
   "fitted"   a, b, c0 solved exactly on ACT_FIT_SHAPES (a = 3.030, b = 1.997, c0 = -0.018 KB)

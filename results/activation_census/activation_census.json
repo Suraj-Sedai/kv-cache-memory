@@ -7,7 +7,12 @@
     "live_d_ff_tensors": 2,
     "mb_at_gelu": 88.01,
     "forward_peak_mb": 88.01,
-    "predicted_mb": 88.0
+    "predicted_mb": 88.0,
+    "attn_read_d_model_tensors": 7,
+    "attn_read_mb": 56.01,
+    "attn_out_proj_d_model_tensors": 7,
+    "attn_out_proj_mb": 56.01,
+    "attn_predicted_mb": 56.0
   },
   {
     "shape": "16L/512d/2048ff",
@@ -17,7 +22,12 @@
     "live_d_ff_tensors": 2,
     "mb_at_gelu": 88.01,
     "forward_peak_mb": 88.01,
-    "predicted_mb": 88.0
+    "predicted_mb": 88.0,
+    "attn_read_d_model_tensors": 7,
+    "attn_read_mb": 56.01,
+    "attn_out_proj_d_model_tensors": 7,
+    "attn_out_proj_mb": 56.01,
+    "attn_predicted_mb": 56.0
   },
   {
     "shape": "4L/512d/2048ff",
@@ -27,7 +37,12 @@
     "live_d_ff_tensors": 2,
     "mb_at_gelu": 88.01,
     "forward_peak_mb": 88.01,
-    "predicted_mb": 88.0
+    "predicted_mb": 88.0,
+    "attn_read_d_model_tensors": 7,
+    "attn_read_mb": 56.01,
+    "attn_out_proj_d_model_tensors": 7,
+    "attn_out_proj_mb": 56.01,
+    "attn_predicted_mb": 56.0
   },
   {
     "shape": "8L/1024d/2048ff",
@@ -37,7 +52,12 @@
     "live_d_ff_tensors": 2,
     "mb_at_gelu": 112.01,
     "forward_peak_mb": 112.14,
-    "predicted_mb": 112.0
+    "predicted_mb": 112.0,
+    "attn_read_d_model_tensors": 7,
+    "attn_read_mb": 112.01,
+    "attn_out_proj_d_model_tensors": 7,
+    "attn_out_proj_mb": 112.01,
+    "attn_predicted_mb": 112.0
   },
   {
     "shape": "8L/512d/4096ff",
@@ -47,7 +67,12 @@
     "live_d_ff_tensors": 2,
     "mb_at_gelu": 152.01,
     "forward_peak_mb": 152.01,
-    "predicted_mb": 152.0
+    "predicted_mb": 152.0,
+    "attn_read_d_model_tensors": 7,
+    "attn_read_mb": 56.01,
+    "attn_out_proj_d_model_tensors": 7,
+    "attn_out_proj_mb": 56.01,
+    "attn_predicted_mb": 56.0
   },
   {
     "shape": "12L/768d/3072ff",
@@ -57,6 +82,11 @@
     "live_d_ff_tensors": 2,
     "mb_at_gelu": 132.01,
     "forward_peak_mb": 132.01,
-    "predicted_mb": 132.0
+    "predicted_mb": 132.0,
+    "attn_read_d_model_tensors": 7,
+    "attn_read_mb": 84.01,
+    "attn_out_proj_d_model_tensors": 7,
+    "attn_out_proj_mb": 84.01,
+    "attn_predicted_mb": 84.0
   }
 ]

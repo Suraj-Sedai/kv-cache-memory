@@ -11,6 +11,11 @@ the five tensors live at the peak (the GELU, src/model_core/mlp.py:22): the bloc
 every swept shape by experiments/activation_census.py (results/activation_census/). The free fit
 on three shapes (3.030, 1.997, c0 -0.018 KB) is printed as validation, not used for prediction.
 
+SCOPE: the activation term is max(7 * d_model, 3 * d_model + 2 * d_ff) elements per token: 7 d_model-wide
+tensors at the attention read / out_proj (attention.py:53, :70), 3 d_model + 2 d_ff at the GELU
+(mlp.py:22). All tested shapes have d_ff >= 2 * d_model, so the GELU branch applies (a tie at
+8L/1024d/2048ff). Counted on the GPU by experiments/activation_census.py.
+
 INT8 cache ratio: int8 codes (1 B) plus one FP16 scale (2 B) per token per head per layer, for
 each of K and V (src/kv_cache/int8_paged.py:23-27), against 2 B per element in FP16, with
 head_dim = d_model / n_heads = 64: (64 + 2) / (2 * 64) = 33/64 = 0.515625.
