@@ -20,6 +20,8 @@ import subprocess
 import sys
 import time
 
+from src.provenance import env_block
+
 OUT_DIR = os.path.join("results", "block_size_sweep")
 CELL = dict(block_size=32, seq_len=1100, batch=16)
 HISTORICAL = {"13fbfae": 226.6, "e383030": 495.3}
@@ -65,6 +67,7 @@ def main():
                         "claim cannot be supported as 'same config' and should be removed.")
     print(f"\nmax/min throughput on {commit}: {summary['max_over_min']}   "
           f"historical (two commits): {summary['historical_max_over_min']}")
+    summary["env"] = env_block()
     path = os.path.join(args.out_dir, "noise_check.json")
     with open(path, "w") as f:
         json.dump(summary, f, indent=2)

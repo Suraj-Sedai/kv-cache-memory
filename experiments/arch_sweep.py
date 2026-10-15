@@ -25,6 +25,7 @@ import torch
 from src.model_core.config import ModelConfig
 from src.model_core.model import GPTModel
 from src.kv_cache.paged import PagedKVCache
+from src.provenance import write_env
 
 SEQ_LEN, BLOCK_SIZE, DECODE_LEN, SEED = 1024, 16, 8, 0
 BUDGET_GB = 9.0
@@ -163,6 +164,7 @@ def main():
     with open(args.output, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nwrote {args.output}")
+    write_env(args.output)
 
 
 if __name__ == "__main__":

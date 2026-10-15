@@ -30,6 +30,7 @@ from src.inference.controller import InferenceController
 from src.kv_cache.paged import PagedKVCache
 from src.model_core.config import ModelConfig
 from src.model_core.model import GPTModel
+from src.provenance import write_env
 
 N_LAYERS, N_HEADS, D_MODEL, D_FF = 8, 8, 512, 2048
 SEED = 0   # added in the cleanup; the committed CSV was produced unseeded
@@ -175,6 +176,7 @@ def main():
         writer.writerows(results)
 
     print(f"\nSaved {len(results)} rows to {args.output}")
+    write_env(args.output)
 
 
 if __name__ == "__main__":

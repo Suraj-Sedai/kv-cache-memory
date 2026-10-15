@@ -12,6 +12,7 @@ from src.kv_cache.contiguous_cache import ContiguousKVCache
 from src.kv_cache.paged import PagedKVCache
 from src.model_core.config import ModelConfig
 from src.model_core.model import GPTModel
+from src.provenance import write_env
 
 # moderate model (8L/8H/512d), FP16 weights, SDPA attention, batched cache.
 #
@@ -241,6 +242,7 @@ def main():
         writer.writerows(results)
 
     print(f"\nSaved {len(results)} rows to {args.output}")
+    write_env(args.output)
 
 
 if __name__ == "__main__":

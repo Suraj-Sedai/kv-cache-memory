@@ -27,6 +27,7 @@ from src.kv_cache.int8_paged import INT8KVCache
 from src.kv_cache.paged import PagedKVCache
 from src.model_core.config import ModelConfig
 from src.model_core.model import GPTModel
+from src.provenance import env_block
 
 CELLS = [(8192, 64), (16384, 32)]
 SEED = 0
@@ -126,6 +127,7 @@ def main():
                        if spilled else
                        "no cell completed above physical memory: no spill observed on this run")
     print("\n" + meta["verdict"])
+    meta["env"] = env_block()
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     with open(args.output, "w") as f:
         json.dump(dict(meta=meta, cells=rows), f, indent=2)

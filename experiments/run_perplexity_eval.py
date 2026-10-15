@@ -24,11 +24,12 @@ import argparse
 import csv
 import math
 import os
-import subprocess
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.cache_utils import DynamicCache
+
+from src.provenance import append_env, git_commit
 
 DEFAULT_TEXT = os.path.join("data", "eval_text.txt")
 OUTPUT_PATH  = os.path.join("results", "perplexity_eval", "exp3_perplexity.csv")
@@ -37,17 +38,6 @@ OUTPUT_PATH  = os.path.join("results", "perplexity_eval", "exp3_perplexity.csv")
 FIELDNAMES   = ["model", "ctx", "n_tokens", "ppl_fp16", "ppl_int8",
                 "ppl_delta", "ppl_pct_increase", "top1_agreement",
                 "corpus", "commit", "excluded"]
-
-
-def git_commit():
-    try:
-        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
-                             capture_output=True, text=True, check=True)
-        dirty = subprocess.run(["git", "status", "--porcelain"],
-                               capture_output=True, text=True).stdout.strip()
-        return out.stdout.strip() + ("-dirty" if dirty else "")
-    except Exception:
-        return "unknown"
 
 
 def fake_quant_per_token(x):
@@ -144,6 +134,7 @@ def main():
             w.writeheader()
         w.writerow(row)
     print(f"Appended to {args.output}")
+    append_env(args.output, {k: row[k] for k in ("model", "ctx", "n_tokens", "corpus")})
 
 
 if __name__ == "__main__":

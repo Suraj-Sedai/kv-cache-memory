@@ -32,6 +32,7 @@ from src.model_core.config import ModelConfig
 from src.model_core.model import GPTModel
 from src.kv_cache.paged import PagedKVCache
 from src.kv_cache.int8_paged import INT8KVCache
+from src.provenance import write_env
 
 N_LAYERS, N_HEADS, D_MODEL, D_FF = 8, 8, 512, 2048
 BLOCK_SIZE, DECODE_LEN, SEED = 16, 8, 0
@@ -178,6 +179,7 @@ def main():
     with open(args.output, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nwrote {args.output}")
+    write_env(args.output)
 
 
 if __name__ == "__main__":
