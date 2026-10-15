@@ -8,6 +8,7 @@
   table 6  pre-fix ledger at 2048x16 and across the grid  <- results/pre_fix/exp3_precision_sweep_e383030.csv
   table 7  effective ceiling below each enforced budget    <- results/oom_frontier, results/pre_fix/wddm_spill.json
   table 8  withdrawn block-size ranking, cells won         <- results/pre_fix/exp2_*, results/block_size_sweep
+  table 9  pitfall-2 batch effect; interleaved vs unpaired <- results/pre_fix/exp1_*, results/paired_layout_check, exp1
 
 The memory-model numbers (0.08%, 11.00 KB/token, ...) are in scripts/check_memory_model.py.
 
@@ -198,6 +199,39 @@ def table8():
         print(f"  {name}: cells won {won} of {sum(won.values())}; mean tok/s by block {avg}")
 
 
+def table9():
+    """Pitfall-2 batch effect vs unpaired-sweep drift, and the interleaved paged/contiguous ratio.
+
+    Batch effect: pre-fix paged tpot_ms at seq 128, batch 16 over batch 1 (exp1 @e383030).
+    Drift: per cell, exp1's unpaired paged/contiguous throughput ratio vs the interleaved median
+    (results/paired_layout_check); the largest disagreement factor is the drift we observed.
+    """
+    pre = pd.read_csv(os.path.join(R, "pre_fix", "exp1_layout_comparison_e383030.csv"))
+    tp = lambda s, b: pre[(pre.cache_type == "paged") & (pre.seq_len == s) & (pre.batch == b)].tpot_ms.iloc[0]
+    print("Table 9: pitfall-2 batch effect vs unpaired drift; interleaved paged/contiguous throughput")
+    print(f"  pre-fix paged TPOT, seq 128: batch 1 {tp(128, 1):.3f} -> batch 16 {tp(128, 16):.3f} ms "
+          f"= {tp(128, 16) / tp(128, 1):.2f}x; batch 1: seq 128 {tp(128, 1):.3f} -> seq 2048 {tp(2048, 1):.3f} ms "
+          f"= {tp(2048, 1) / tp(128, 1):.2f}x")
+    e1 = pd.read_csv(os.path.join(R, "cache_comparison", "exp1_layout_comparison.csv")).set_index(
+        ["cache_type", "seq_len", "batch"])
+    paired = json.load(open(os.path.join(R, "paired_layout_check", "paired_layout_check.json")))["cells"]
+    drift = []
+    for c in paired:
+        k = (c["seq_len"], c["batch"])
+        unp = e1.throughput[("paged",) + k] / e1.throughput[("contiguous",) + k]
+        f = max(unp, c["median_ratio"]) / min(unp, c["median_ratio"])
+        drift.append(f)
+        slower = sum(p["ratio"] < 1 for p in c["pairs"])
+        print(f"  {k[0]}x{k[1]}: interleaved median {c['median_ratio']:.3f} "
+              f"(range {c['min_ratio']:.3f}-{c['max_ratio']:.3f}, paged slower in {slower}/{len(c['pairs'])} pairs); "
+              f"exp1 unpaired {unp:.3f}; disagreement {f:.2f}x")
+    meds = [c["median_ratio"] for c in paired]
+    n_pairs = sum(len(c["pairs"]) for c in paired)
+    n_slow = sum(p["ratio"] < 1 for c in paired for p in c["pairs"])
+    print(f"  interleaved medians {min(meds):.2f}-{max(meds):.2f}; paged slower in {n_slow}/{n_pairs} pairs; "
+          f"largest unpaired-vs-interleaved disagreement {max(drift):.2f}x")
+
+
 def table4():
     d = pd.read_csv(os.path.join(R, "cache_comparison", "exp1_layout_comparison.csv"))
     d = d[d.status == "ok"]
@@ -282,6 +316,8 @@ if __name__ == "__main__":
     table7()
     print()
     table8()
+    print()
+    table9()
     print()
     failed = check_reported()
     for p in args.against:
