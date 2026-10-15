@@ -33,9 +33,10 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 from src.memory_model import allocated_slots, arch_sweep_config, predict_slopes  # noqa: E402
 
-# Activation coefficients for figure 1: "fitted" or "integer". Pending the author's choice;
-# keep in sync with scripts/check_memory_model.py.
-COEFFS = "fitted"
+# Activation coefficients for figure 1: integer, 3 * d_model + 2 * d_ff (the five tensors live at
+# the peak; see scripts/check_memory_model.py and experiments/activation_census.py).
+COEFFS = "integer"
+HELD_OUT = "12L/768d/3072ff"   # GPT-2 small: the shape not among the five sweep shapes
 
 RESULTS = os.path.join(REPO, "results")
 OUT = os.path.join(REPO, "figures")
@@ -75,7 +76,7 @@ def figure1():
     _, unc = predict_slopes(arch, corrected=False, coeffs=COEFFS)
     _, cor = predict_slopes(arch, corrected=True, coeffs=COEFFS)
     df = pd.DataFrame({
-        "shape": [r["shape"] for r in cor], "held_out": [r["held_out"] for r in cor],
+        "shape": [r["shape"] for r in cor], "held_out": [r["shape"] == HELD_OUT for r in cor],
         "measured": [r["measured"] for r in cor],
         "pred_uncorrected": [r["predicted"] for r in unc], "pred_corrected": [r["predicted"] for r in cor],
         "err_uncorrected_pct": [r["error_pct"] for r in unc], "err_corrected_pct": [r["error_pct"] for r in cor],
@@ -89,14 +90,14 @@ def figure1():
     axL.plot([lo, hi], [lo, hi], color=INK_3, lw=1, ls="--", zorder=1, label="predicted = measured")
     fit, held = df[~df.held_out], df[df.held_out]
     axL.scatter(fit.measured, fit.pred_corrected, s=42, color=BLUE, edgecolor=SURFACE, lw=1.5,
-                zorder=3, label="fit shapes")
+                zorder=3, label="sweep shapes")
     axL.scatter(held.measured, held.pred_corrected, s=42, facecolor=SURFACE, edgecolor=BLUE, lw=2,
-                zorder=3, label="held-out shapes")
+                zorder=3, label="held out (GPT-2 small)")
     for r in df.itertuples():
         axL.annotate(r.shape, (r.measured, r.pred_corrected), xytext=(5, -9 if r.held_out else 4),
                      textcoords="offset points", fontsize=7, color=INK_2)
     axL.set(xlim=(lo, hi), ylim=(lo, hi), xlabel="measured slope (KB per token)",
-            ylabel="predicted slope (KB per token)", title="Corrected model vs measurement")
+            ylabel="predicted slope (KB per token)", title="Model (3·d_model + 2·d_ff) vs measurement")
     axL.set_aspect("equal")
     axL.legend(loc="upper left", fontsize=8)
 
@@ -109,14 +110,14 @@ def figure1():
     axR.axvline(0, color=INK_3, lw=0.8)
     for yi, r in zip(y, df.itertuples()):
         for val, off in ((r.err_uncorrected_pct, h / 2), (r.err_corrected_pct, -h / 2)):
-            if not r.held_out:
-                if off > 0:
-                    axR.text(0.03, yi, "0 by construction (fit shape)", va="center", fontsize=7, color=INK_3)
-            elif abs(val) >= 0.005:
+            if abs(val) < 0.005:
+                axR.text(0.03, yi + off, "0.00%", va="center", ha="left", fontsize=7, color=INK_2)
+            else:
                 axR.text(val + (0.02 if val >= 0 else -0.02), yi + off, f"{val:+.2f}%",
                          va="center", ha="left" if val >= 0 else "right", fontsize=7, color=INK_2)
     axR.set_yticks(y, [s + ("  (held out)" if ho else "") for s, ho in zip(df["shape"], df.held_out)])
-    axR.set_xlim(-0.95, 0.95)
+    lim = max(df.err_uncorrected_pct.abs().max(), df.err_corrected_pct.abs().max())
+    axR.set_xlim(-lim * 1.35 if df.err_uncorrected_pct.min() < 0 else -0.3, max(0.3, lim * 0.6))
     axR.grid(axis="y", visible=False)
     axR.set(xlabel="prediction error (% of measured slope)", title="Error by architecture")
     axR.legend(loc="lower center", bbox_to_anchor=(0.5, 1.07), ncol=2, fontsize=8)

@@ -1,0 +1,62 @@
+[
+  {
+    "shape": "8L/512d/2048ff",
+    "batch": 8,
+    "tokens": 8192,
+    "live_d_model_tensors": 3,
+    "live_d_ff_tensors": 2,
+    "mb_at_gelu": 88.01,
+    "forward_peak_mb": 88.01,
+    "predicted_mb": 88.0
+  },
+  {
+    "shape": "16L/512d/2048ff",
+    "batch": 8,
+    "tokens": 8192,
+    "live_d_model_tensors": 3,
+    "live_d_ff_tensors": 2,
+    "mb_at_gelu": 88.01,
+    "forward_peak_mb": 88.01,
+    "predicted_mb": 88.0
+  },
+  {
+    "shape": "4L/512d/2048ff",
+    "batch": 8,
+    "tokens": 8192,
+    "live_d_model_tensors": 3,
+    "live_d_ff_tensors": 2,
+    "mb_at_gelu": 88.01,
+    "forward_peak_mb": 88.01,
+    "predicted_mb": 88.0
+  },
+  {
+    "shape": "8L/1024d/2048ff",
+    "batch": 8,
+    "tokens": 8192,
+    "live_d_model_tensors": 3,
+    "live_d_ff_tensors": 2,
+    "mb_at_gelu": 112.01,
+    "forward_peak_mb": 112.14,
+    "predicted_mb": 112.0
+  },
+  {
+    "shape": "8L/512d/4096ff",
+    "batch": 8,
+    "tokens": 8192,
+    "live_d_model_tensors": 3,
+    "live_d_ff_tensors": 2,
+    "mb_at_gelu": 152.01,
+    "forward_peak_mb": 152.01,
+    "predicted_mb": 152.0
+  },
+  {
+    "shape": "12L/768d/3072ff",
+    "batch": 8,
+    "tokens": 8192,
+    "live_d_model_tensors": 3,
+    "live_d_ff_tensors": 2,
+    "mb_at_gelu": 132.01,
+    "forward_peak_mb": 132.01,
+    "predicted_mb": 132.0
+  }
+]
