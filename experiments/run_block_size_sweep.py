@@ -40,7 +40,7 @@ N_WARMUP    = 3
 N_MEASURE   = 20
 BUDGET_S    = 20.0   # one warmup slower than this -> cell thrashes -> 'slow'
 
-OUTPUT_PATH = os.path.join("experiments", "results", "exp2_block_size_sweep.csv")
+OUTPUT_PATH = os.path.join("results", "block_size_sweep", "exp2_block_size_sweep.csv")
 FIELDNAMES  = ["cache_type", "seq_len", "batch", "block_size", "status",
                "ttft_ms", "tpot_ms", "throughput", "throughput_cv",
                "peak_memory_mb", "cache_memory_mb", "frag_ratio"]

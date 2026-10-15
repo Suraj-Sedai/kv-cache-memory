@@ -13,7 +13,7 @@ independently and checks the measured cache slope against the prediction.
 Uses the established peak = f(batch*seq_len) invariance: seq_len is fixed and
 batch varies to hit target token counts, rather than sweeping both.
 
-Memory only, no timing. Run:  python -m benchmarks.arch_sweep
+Memory only, no timing. Run:  python -m experiments.arch_sweep
 """
 import gc
 import json
@@ -39,7 +39,7 @@ ARCHS = [
     ("2x d_ff     8L/512d/4096ff",   8,  512,  8, 4096),
     ("gpt2-small 12L/768d/3072ff", 12, 768, 12, 3072)
 ]
-OUT = os.path.join("experiments", "results", "arch_sweep.json")
+OUT = os.path.join("results", "arch_sweep", "arch_sweep.json")
 
 
 def cache_kb_per_token(n_layers, d_model, bytes_per=2):

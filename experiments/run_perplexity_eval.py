@@ -29,8 +29,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.cache_utils import DynamicCache
 
-DEFAULT_TEXT = os.path.join("experiments", "data", "eval_text.txt")
-OUTPUT_PATH  = os.path.join("experiments", "results", "exp3_perplexity.csv")
+DEFAULT_TEXT = os.path.join("data", "eval_text.txt")
+OUTPUT_PATH  = os.path.join("results", "perplexity_eval", "exp3_perplexity.csv")
 FIELDNAMES   = ["model", "ctx", "n_tokens", "ppl_fp16", "ppl_int8",
                 "ppl_delta", "ppl_pct_increase", "top1_agreement"]
 

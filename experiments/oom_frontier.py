@@ -19,7 +19,7 @@ Memory only -- no timing loop. Peak is reached during prefill (activations plus
 a nearly-full cache, since _ensure_capacity allocates prefill pages up front),
 so prefill plus a few decode steps is enough.
 
-Run:  python -m benchmarks.oom_frontier
+Run:  python -m experiments.oom_frontier
 """
 import gc
 import json
@@ -45,7 +45,7 @@ LADDER = [(8192, 32), (8192, 48), (8192, 64), (16384, 16), (16384, 32)]
 # fp16 should fail and int8 survive between them, and both should fail below.
 BUDGETS_GB = [8.0, 9.0, 10.0, 11.0, 11.5]
 
-OUT = os.path.join("experiments", "results", "oom_frontier.json")
+OUT = os.path.join("results", "oom_frontier", "oom_frontier.json")
 
 
 def set_budget(gb):

@@ -58,7 +58,7 @@ BUDGET_S    = 20.0   # if one warmup run exceeds this, the cell thrashes under
                      # memory pressure on this GPU -> mark 'slow', skip timing
 
 COMMIT      = "unknown"   # set in main()
-OUTPUT_PATH = os.path.join("experiments", "results", "exp1_layout_comparison.csv")
+OUTPUT_PATH = os.path.join("results", "cache_comparison", "exp1_layout_comparison.csv")
 FIELDNAMES  = ["cache_type", "seq_len", "batch", "block_size", "status",
                "ttft_ms", "tpot_ms", "throughput", "throughput_cv",
                "peak_memory_mb", "cache_memory_mb", "frag_ratio", "alloc_basis",
