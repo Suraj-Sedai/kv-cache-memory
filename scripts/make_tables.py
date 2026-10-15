@@ -4,6 +4,9 @@
   table 2  FP16 / INT8 per-token fits, tokens that fit in 8 GB (same file; notebook 04's fit)
   table 3  INT8 perplexity cost on real GPT-2 weights      <- results/perplexity_eval/exp3_perplexity.csv
   table 4  paged / contiguous throughput range             <- results/cache_comparison/exp1_layout_comparison.csv
+  table 5  decode-step FLOPs and arithmetic share of TPOT  <- results/precision_sweep (+ --peak-tflops)
+  table 6  pre-fix ledger at 2048x16 and across the grid  <- results/pre_fix/exp3_precision_sweep_e383030.csv
+  table 7  effective ceiling below each enforced budget    <- results/oom_frontier, results/pre_fix/wddm_spill.json
 
 The memory-model numbers (0.08%, 11.00 KB/token, ...) are in scripts/check_memory_model.py.
 
@@ -17,6 +20,7 @@ Exit status 1 if a reported value or a rerun comparison fails.
 """
 import argparse
 import glob
+import json
 import os
 import sys
 
@@ -71,6 +75,104 @@ def table3():
           f" top-1 predictions flipped {100 * (1 - cited.top1_agreement.max()):.1f}-"
           f"{100 * (1 - cited.top1_agreement.min()):.1f}%;"
           f" {len(p) - len(cited)} excluded row(s)\n")
+
+
+def decode_step_flops(n_layers, d_model, d_ff, vocab, batch, context):
+    """FLOPs of one decode step (one new token per sequence), multiply-add = 2 FLOPs.
+
+    Inputs and where they come from:
+      n_layers, d_model, d_ff  N_LAYERS, D_MODEL, D_FF in experiments/run_precision_sweep.py
+      vocab                    ModelConfig.vocab_size (50257)
+      batch, context           the CSV cell: batch, and seq_len + tokens already decoded
+    Per sequence: projections 2*n_layers*(4*d_model^2 + 2*d_model*d_ff), attention over the
+    context 4*n_layers*d_model*context (QK^T and AV), LM head 2*d_model*vocab.
+    """
+    per_seq = (2 * n_layers * (4 * d_model ** 2 + 2 * d_model * d_ff)
+               + 4 * n_layers * d_model * context + 2 * d_model * vocab)
+    return batch * per_seq
+
+
+def table5(peak_tflops=None):
+    """Arithmetic share of a decode step = FLOPs / device throughput / measured TPOT.
+
+    Every input except the device's FP16 throughput is in committed files. The throughput is
+    not measured or recorded anywhere in results/, so it must be passed as --peak-tflops.
+    """
+    d = pd.read_csv(os.path.join(R, "precision_sweep", "exp3_precision_sweep.csv"))
+    d = d[(d.status == "ok") & (d.cache_type == "paged_fp16")].copy()
+    decode_len = 60                                      # DECODE_LEN in run_precision_sweep.py
+    d["context"] = d.seq_len + decode_len / 2            # mean context over the decode steps
+    d["gflop_per_step"] = [decode_step_flops(8, 512, 2048, 50257, r.batch, r.context) / 1e9
+                           for r in d.itertuples()]
+    print("Table 5: decode-step arithmetic (FP16 paged, precision sweep)")
+    cols = ["seq_len", "batch", "tpot_ms", "gflop_per_step"]
+    if peak_tflops:
+        d["arith_ms"] = d.gflop_per_step / (peak_tflops * 1e3)
+        d["arith_pct_of_tpot"] = 100 * d.arith_ms / d.tpot_ms
+        cols += ["arith_ms", "arith_pct_of_tpot"]
+        print(f"  at {peak_tflops:g} TFLOP/s: arithmetic is {d.arith_pct_of_tpot.min():.2f}-"
+              f"{d.arith_pct_of_tpot.max():.2f}% of TPOT across cells")
+    else:
+        print("  device FP16 throughput not in committed results: pass --peak-tflops to get the share")
+    print(d[cols].round(4).to_string(index=False))
+
+
+def table6():
+    """Pre-fix ledger (LM head over all prefill positions), single source exp3 @e383030."""
+    pre = pd.read_csv(os.path.join(R, "pre_fix", "exp3_precision_sweep_e383030.csv"))
+    post = pd.read_csv(os.path.join(R, "precision_sweep", "exp3_precision_sweep.csv"))
+    pick = lambda d, s, b: d[(d.cache_type == "paged_fp16") & (d.seq_len == s) & (d.batch == b)].iloc[0]
+    a, b = pick(pre, 2048, 16), pick(post, 2048, 16)
+    logits_mb = 16 * 2048 * 50257 * 2 / 2 ** 20              # [B, T, vocab] fp16, all positions
+    print("Table 6: LM-head fix at 2048x16, FP16 paged (pre: results/pre_fix/exp3_precision_sweep_e383030.csv)")
+    print(f"  before: cache {a.cache_memory_mb:.1f} / peak {a.peak_memory_mb:.2f} MB = "
+          f"{100 * a.cache_memory_mb / a.peak_memory_mb:.1f}%; logits 16*2048*50257*2 B = {logits_mb:.1f} MB "
+          f"= {100 * logits_mb / a.peak_memory_mb:.1f}% of peak")
+    print(f"  after:  cache {b.cache_memory_mb:.1f} / peak {b.peak_memory_mb:.2f} MB = "
+          f"{100 * b.cache_memory_mb / b.peak_memory_mb:.1f}%")
+    g = pre[(pre.cache_type == "paged_fp16") & (pre.status == "ok")].copy()
+    g["share"] = 100 * g.cache_memory_mb / g.peak_memory_mb
+    lo, hi = g.loc[g.share.idxmin()], g.loc[g.share.idxmax()]
+    print(f"  before, across the {len(g)} ok FP16 cells: {lo.share:.1f}% ({int(lo.seq_len)}x{int(lo.batch)}) "
+          f"to {hi.share:.1f}% ({int(hi.seq_len)}x{int(hi.batch)}); not ok: "
+          + ", ".join(f"{int(r.seq_len)}x{int(r.batch)} {r.status}"
+                      for r in pre[(pre.cache_type == "paged_fp16") & (pre.status != "ok")].itertuples()))
+
+
+def table7():
+    """Effective ceiling under set_per_process_memory_fraction, bracketed by the data.
+
+    The cap applies to reserved memory, the peak column is allocated memory. For each budget:
+    a cell that completes proves the ceiling is >= its allocated peak; a cell that OOMs although
+    its allocated peak (known from another budget, or from the uncapped wddm_spill run) is under
+    the budget proves the ceiling is < that peak.
+    """
+    o = json.load(open(os.path.join(R, "oom_frontier", "oom_frontier.json")))
+    w = json.load(open(os.path.join(R, "pre_fix", "wddm_spill.json")))["cells"]
+    peak = {(r["seq_len"], r["batch"], dt): r[dt]["peak_mb"] for r in o for dt in ("fp16", "int8")
+            if r[dt]["status"] == "ok"}
+    for c in w:
+        peak.setdefault((c["seq_len"], c["batch"], c["dtype"]), c["peak_allocated_mb"])
+    print("Table 7: effective ceiling vs stated budget (results/oom_frontier + results/pre_fix/wddm_spill.json)")
+    for B in sorted({r["budget_gb"] for r in o}):
+        cap, lo, hi = B * 1024, (0.0, None), (None, None)
+        for r in (r for r in o if r["budget_gb"] == B):
+            for dt in ("fp16", "int8"):
+                k = (r["seq_len"], r["batch"], dt)
+                P = peak.get(k)
+                if P is None:
+                    continue
+                if r[dt]["status"] == "ok" and P > lo[0]:
+                    lo = (P, k)
+                if r[dt]["status"] == "oom" and P < cap and (hi[0] is None or P < hi[0]):
+                    hi = (P, k)
+        name = lambda k: f"{k[0]}x{k[1]} {k[2]}"
+        line = f"  {B:>4g} GB: ceiling >= {lo[0]:.1f} MB ({name(lo[1])}), at most {100 * (1 - lo[0] / cap):.1f}% below"
+        if hi[0] is not None:
+            line += f"; ceiling < {hi[0]:.1f} MB ({name(hi[1])}), at least {100 * (1 - hi[0] / cap):.1f}% below"
+        else:
+            line += "; no OOM below the budget, so no lower bound on the gap"
+        print(line)
 
 
 def table4():
@@ -145,10 +247,18 @@ def compare(path):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Print the paper tables from committed results.")
     ap.add_argument("--against", nargs="*", default=[], help="rerun CSV(s) to compare with the committed ones")
+    ap.add_argument("--peak-tflops", type=float, default=None,
+                    help="device FP16 throughput for Table 5 (not in committed results)")
     args = ap.parse_args()
     table1_2()
     table3()
     table4()
+    print()
+    table5(args.peak_tflops)
+    print()
+    table6()
+    print()
+    table7()
     print()
     failed = check_reported()
     for p in args.against:
