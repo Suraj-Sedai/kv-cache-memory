@@ -36,7 +36,7 @@ None raised an error. Each returned a believable number.
 | Bug | What I wrongly concluded | How to spot it in your own setup |
 |---|---|---|
 | LM head ran on every prefill position, not just the last | KV cache is at most 14% of peak, so INT8 can't help | Measured peak is bigger than your hand-computed sum of tensors |
-| Attention looped over the batch in Python | Decode is launch-bound on this GPU | Latency barely moves across 16× changes in batch and seq_len |
+| Attention looped over the batch in Python | Decode is launch-bound on this GPU | Per-token latency grows with batch but stays flat across seq_len: cost scales with Python loop iterations, not attention work. Before the fix, paged TPOT at seq 128 went 4.92 → 23.23 ms from batch 1 to 16, and at batch 1 went 4.92 → 5.09 ms from seq 128 to 2048 |
 | Contiguous cache reserved exactly the final length | Contiguous never fragments | Fragmentation is exactly 0 in every cell |
 | Windows driver spilled to host RAM instead of failing | This GPU never runs out of memory | 14,009 MB "allocated" on an 11.9 GB card |
 
