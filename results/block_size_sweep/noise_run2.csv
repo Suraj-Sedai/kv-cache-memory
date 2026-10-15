@@ -1,0 +1,2 @@
+cache_type,seq_len,batch,block_size,status,ttft_ms,tpot_ms,throughput,throughput_cv,peak_memory_mb,cache_memory_mb,frag_ratio
+paged,1100,16,32,ok,34.534,11.377,1232.3,2.74,646.09,296.0,0.0203

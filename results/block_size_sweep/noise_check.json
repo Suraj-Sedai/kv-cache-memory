@@ -1,0 +1,39 @@
+{
+  "cell": {
+    "block_size": 32,
+    "seq_len": 1100,
+    "batch": 16
+  },
+  "commit": "8251fad",
+  "seed": 0,
+  "full_sweep": false,
+  "runs": [
+    {
+      "run": 1,
+      "csv": "results\\block_size_sweep\\noise_run1.csv",
+      "wall_s": 18.9,
+      "status": "ok",
+      "throughput": "1456.6",
+      "throughput_cv": "23.33",
+      "tpot_ms": "10.568",
+      "peak_memory_mb": "646.09"
+    },
+    {
+      "run": 2,
+      "csv": "results\\block_size_sweep\\noise_run2.csv",
+      "wall_s": 22.0,
+      "status": "ok",
+      "throughput": "1232.3",
+      "throughput_cv": "2.74",
+      "tpot_ms": "11.377",
+      "peak_memory_mb": "646.09"
+    }
+  ],
+  "max_over_min": 1.182,
+  "historical": {
+    "13fbfae": 226.6,
+    "e383030": 495.3
+  },
+  "historical_max_over_min": 2.186,
+  "note": "Paper claim: 'Two runs of the same config gave 227 and 495 tok/s'. If max_over_min on one commit is far below the historical ratio, the claim cannot be supported as 'same config' and should be removed."
+}
