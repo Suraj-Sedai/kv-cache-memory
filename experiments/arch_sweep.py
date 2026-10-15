@@ -15,6 +15,7 @@ batch varies to hit target token counts, rather than sweeping both.
 
 Memory only, no timing. Run:  python -m experiments.arch_sweep
 """
+import argparse
 import gc
 import json
 import os
@@ -96,13 +97,29 @@ def fit(xs, ys):
     return a, b, max(abs(a*x + b - y) for x, y in zip(xs, ys))
 
 
+def parse_args():
+    """Defaults are the constants above; parsing happens before any GPU work."""
+    ap = argparse.ArgumentParser(description="Exp 5: memory slope across architectures.")
+    ap.add_argument("--archs", type=lambda s: s.split(","), default=None,
+                    help="comma-separated substrings of arch labels to run, e.g. 8L/512d/2048ff "
+                         "(default: all %d)" % len(ARCHS))
+    ap.add_argument("--budget-gb", type=float, default=BUDGET_GB)
+    ap.add_argument("--seed", type=int, default=SEED)
+    ap.add_argument("--output", default=OUT, help="JSON path (overwritten)")
+    return ap.parse_args()
+
+
 def main():
+    global SEED
+    args = parse_args()
+    SEED = args.seed
+    archs = [a for a in ARCHS if args.archs is None or any(k in a[0] for k in args.archs)]
     assert torch.cuda.is_available(), "needs the GPU"
-    set_budget(BUDGET_GB)
-    print(f"{torch.cuda.get_device_name()}   seq_len {SEQ_LEN}, budget {BUDGET_GB} GB\n")
+    set_budget(args.budget_gb)
+    print(f"{torch.cuda.get_device_name()}   seq_len {SEQ_LEN}, budget {args.budget_gb} GB\n")
 
     results = []
-    for label, L, D, H, FF in ARCHS:
+    for label, L, D, H, FF in archs:
         pred_cache = cache_kb_per_token(L, D)
         # rough total slope for picking batch sizes: cache + activations (~11 KB at
         # d_model 512, assumed to scale with d_model and d_ff)
@@ -142,10 +159,10 @@ def main():
     print("  - measured slope minus predicted cache should be positive everywhere;")
     print("    if it is negative the cache prediction is wrong, not the activations")
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as f:
+    os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
+    with open(args.output, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"\nwrote {OUT}")
+    print(f"\nwrote {args.output}")
 
 
 if __name__ == "__main__":

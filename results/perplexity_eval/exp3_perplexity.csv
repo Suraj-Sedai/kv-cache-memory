@@ -1,4 +1,4 @@
-model,ctx,n_tokens,ppl_fp16,ppl_int8,ppl_delta,ppl_pct_increase,top1_agreement
-gpt2,512,284614,35.962,35.9627,0.0007,0.002,0.9854
-gpt2-medium,512,284614,25.3947,25.3963,0.0016,0.006,0.9883
-gpt2,512,1135,23.7315,23.7146,-0.0169,-0.071,0.9815
+model,ctx,n_tokens,ppl_fp16,ppl_int8,ppl_delta,ppl_pct_increase,top1_agreement,corpus,commit,excluded
+gpt2,512,284614,35.962,35.9627,0.0007,0.002,0.9854,wikitext2_test.txt,eae781c,
+gpt2-medium,512,284614,25.3947,25.3963,0.0016,0.006,0.9883,wikitext2_test.txt,eae781c,
+gpt2,512,1135,23.7315,23.7146,-0.0169,-0.071,0.9815,eval_text.txt,f7826fa,"1,135-token test run on eval_text.txt, not WikiText-2; do not cite"

@@ -21,6 +21,7 @@ so prefill plus a few decode steps is enough.
 
 Run:  python -m experiments.oom_frontier
 """
+import argparse
 import gc
 import json
 import os
@@ -114,7 +115,23 @@ def try_cell(seq_len, batch, quantized, device):
         cleanup()
 
 
+def parse_args():
+    """Defaults are the constants above; parsing happens before any GPU work."""
+    floats = lambda s: [float(x) for x in s.split(",")]
+    cells = lambda s: [tuple(int(v) for v in c.split("x")) for c in s.split(",")]
+    ap = argparse.ArgumentParser(description="OOM frontier under enforced memory budgets.")
+    ap.add_argument("--budgets-gb", type=floats, default=BUDGETS_GB, help="comma-separated (default: %(default)s)")
+    ap.add_argument("--cells", type=cells, default=LADDER,
+                    help="comma-separated SEQxBATCH, e.g. 8192x32,16384x16 (default: the 5-cell ladder)")
+    ap.add_argument("--seed", type=int, default=SEED)
+    ap.add_argument("--output", default=OUT, help="JSON path (overwritten)")
+    return ap.parse_args()
+
+
 def main():
+    global SEED
+    args = parse_args()
+    SEED = args.seed
     assert torch.cuda.is_available(), "needs the GPU"
     dev = "cuda"
     total_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
@@ -123,12 +140,13 @@ def main():
           "otherwise hide every OOM\n")
 
     results = []
-    for gb in BUDGETS_GB:
+    for gb in args.budgets_gb:
         set_budget(gb)
         print(f"--- budget {gb:g} GB " + "-" * 46)
         print(f"{'seq':>7} {'batch':>6} {'fp16':>22} {'int8':>22}   verdict")
-        for seq_len, batch in LADDER:
-            row = {"budget_gb": gb, "seq_len": seq_len, "batch": batch}
+        for seq_len, batch in args.cells:
+            row = {"budget_gb": gb, "seq_len": seq_len, "batch": batch,
+                   "gpu": torch.cuda.get_device_name()}
             cells = []
             for label, q in (("fp16", False), ("int8", True)):
                 st, peak, cm = try_cell(seq_len, batch, q, dev)
@@ -156,10 +174,10 @@ def main():
         print("No cell separates the two dtypes. If both OOM everywhere the cache is "
               "not the binding constraint -- prefill activations are. Report that.")
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as f:
+    os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
+    with open(args.output, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"\nwrote {OUT}")
+    print(f"\nwrote {args.output}")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import argparse
 import csv
 import os
 import statistics
@@ -137,23 +138,37 @@ def run_one(model, model_config, cache, prompt_ids):
     return controller.generate(prompt_ids, max_new_tokens=DECODE_LEN, cache=cache, use_cache=True)
 
 
+def parse_args():
+    """Defaults are the constants above; parsing happens before any GPU work."""
+    ints = lambda s: [int(x) for x in s.split(",")]
+    ap = argparse.ArgumentParser(description="Exp 1: contiguous vs paged KV cache (FP16).")
+    ap.add_argument("--cache-types", type=lambda s: s.split(","), default=["contiguous", "paged"],
+                    help="comma-separated subset of contiguous,paged")
+    ap.add_argument("--seq-lens", type=ints, default=SEQ_LENS, help="comma-separated (default: %(default)s)")
+    ap.add_argument("--batches", type=ints, default=BATCH_SIZES, help="comma-separated (default: %(default)s)")
+    ap.add_argument("--seed", type=int, default=SEED)
+    ap.add_argument("--output", default=OUTPUT_PATH, help="CSV path (overwritten)")
+    return ap.parse_args()
+
+
 def main():
+    args = parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     global COMMIT
     COMMIT = git_commit()
     print(f"Running on: {device}  |  model: {N_LAYERS}L/{N_HEADS}H/{D_MODEL}d")
 
-    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     results = []
 
-    for cache_type in ["contiguous", "paged"]:
-        for seq_len in SEQ_LENS:
-            for batch in BATCH_SIZES:
+    for cache_type in args.cache_types:
+        for seq_len in args.seq_lens:
+            for batch in args.batches:
                 max_seq_len = seq_len + DECODE_LEN
                 final_len = seq_len + DECODE_LEN
                 model_config = ModelConfig(max_seq_len=max_seq_len, n_layers=N_LAYERS,
                                            n_heads=N_HEADS, d_model=D_MODEL, d_ff=D_FF)
-                torch.manual_seed(SEED)   # identical weights + prompts per cell
+                torch.manual_seed(args.seed)   # identical weights + prompts per cell
                 model = GPTModel(model_config).to(device).half()   # FP16 weights
                 io_dtype = next(model.parameters()).dtype
                 prompt_ids = torch.randint(0, model_config.vocab_size, (batch, seq_len), device=device)
@@ -220,12 +235,12 @@ def main():
                 if device == "cuda":
                     torch.cuda.empty_cache()
 
-    with open(OUTPUT_PATH, "w", newline="") as f:
+    with open(args.output, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
         writer.writeheader()
         writer.writerows(results)
 
-    print(f"\nSaved {len(results)} rows to {OUTPUT_PATH}")
+    print(f"\nSaved {len(results)} rows to {args.output}")
 
 
 if __name__ == "__main__":

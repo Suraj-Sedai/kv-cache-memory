@@ -24,6 +24,7 @@ import argparse
 import csv
 import math
 import os
+import subprocess
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -31,8 +32,22 @@ from transformers.cache_utils import DynamicCache
 
 DEFAULT_TEXT = os.path.join("data", "eval_text.txt")
 OUTPUT_PATH  = os.path.join("results", "perplexity_eval", "exp3_perplexity.csv")
+# corpus = basename of --text; commit = code version at run time; excluded = non-empty
+# reason if the row must not be cited (rows are never deleted from this file).
 FIELDNAMES   = ["model", "ctx", "n_tokens", "ppl_fp16", "ppl_int8",
-                "ppl_delta", "ppl_pct_increase", "top1_agreement"]
+                "ppl_delta", "ppl_pct_increase", "top1_agreement",
+                "corpus", "commit", "excluded"]
+
+
+def git_commit():
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, check=True)
+        dirty = subprocess.run(["git", "status", "--porcelain"],
+                               capture_output=True, text=True).stdout.strip()
+        return out.stdout.strip() + ("-dirty" if dirty else "")
+    except Exception:
+        return "unknown"
 
 
 def fake_quant_per_token(x):
@@ -84,6 +99,7 @@ def main():
     ap.add_argument("--text", default=DEFAULT_TEXT, help="eval corpus (plain text)")
     ap.add_argument("--ctx", type=int, default=512, help="context window for NLL")
     ap.add_argument("--max-tokens", type=int, default=0, help="cap tokens (0 = all)")
+    ap.add_argument("--output", default=OUTPUT_PATH, help="CSV to append to")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -110,17 +126,24 @@ def main():
     row = {"model": args.model, "ctx": args.ctx, "n_tokens": ids.size(1),
            "ppl_fp16": round(ppl_fp16, 4), "ppl_int8": round(ppl_int8, 4),
            "ppl_delta": round(delta, 4), "ppl_pct_increase": round(pct, 3),
-           "top1_agreement": round(top1, 4)}
+           "top1_agreement": round(top1, 4),
+           "corpus": os.path.basename(args.text), "commit": git_commit(), "excluded": ""}
     print(row)
 
-    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
-    write_header = not os.path.exists(OUTPUT_PATH)
-    with open(OUTPUT_PATH, "a", newline="") as f:
+    os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
+    write_header = not os.path.exists(args.output)
+    if not write_header:
+        with open(args.output, newline="") as f:
+            header = next(csv.reader(f))
+        if header != FIELDNAMES:
+            raise SystemExit(f"{args.output} has columns {header}, expected {FIELDNAMES}; "
+                             "refusing to append misaligned rows")
+    with open(args.output, "a", newline="") as f:
         w = csv.DictWriter(f, fieldnames=FIELDNAMES)
         if write_header:
             w.writeheader()
         w.writerow(row)
-    print(f"Appended to {OUTPUT_PATH}")
+    print(f"Appended to {args.output}")
 
 
 if __name__ == "__main__":
