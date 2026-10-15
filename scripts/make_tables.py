@@ -111,7 +111,7 @@ def table5():
     peak_path = os.path.join(R, "matmul_peak", "matmul_peak.json")
     if os.path.exists(peak_path):
         tflops = json.load(open(peak_path))["achievable_tflops"]
-        d["arith_ms"] = d.gflop_per_step / (tflops * 1e3)
+        d["arith_ms"] = d.gflop_per_step / tflops      # 1 TFLOP/s = 1 GFLOP per ms
         d["arith_pct_of_tpot"] = 100 * d.arith_ms / d.tpot_ms
         cols += ["arith_ms", "arith_pct_of_tpot"]
         top = d.loc[d.arith_pct_of_tpot.idxmax()]
