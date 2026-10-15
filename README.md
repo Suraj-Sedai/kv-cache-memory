@@ -54,22 +54,61 @@ None raised an error. Each returned a believable number.
 - The paged cache copies blocks into one tensor before attention (no fused kernel), so its speed is not the speed of paging in a real server.
 - No latency claims. At this model size a decode step is mostly kernel-launch overhead.
 
+## Repository layout
+
+```
+src/                 KV caches (contiguous, paged, INT8 paged), model, profiling, memory_model.py
+experiments/         one runner per experiment; every runner takes --help and --seed
+results/<runner>/    committed outputs of each runner
+results/pre_fix/     outputs from before the four fixes, with a README mapping each to its bug
+scripts/             make_figures.py, make_tables.py, check_memory_model.py (no GPU needed)
+figures/             written only by scripts/make_figures.py
+notebooks/           04 memory model and OOM frontier, 05 architecture sweep
+data/                WikiText-2 test set, short eval text
+tests/               56 tests; paged and contiguous must produce identical tokens
+```
+
 ## Reproduce
 
-Needs an NVIDIA GPU. Install PyTorch with CUDA first ([pytorch.org](https://pytorch.org/get-started/locally/); tested on 2.11 with CUDA 12.8), then:
+### From the committed results (no GPU, seconds)
 
 ```
 pip install -r requirements.txt
-python -m pytest -q        # 56 tests; paged and contiguous must produce identical tokens
 ```
 
-| Command | Writes to `experiments/results/` |
-|---|---|
-| `python -m benchmarks.arch_sweep` | `arch_sweep.json` (memory model) |
-| `python -m benchmarks.run_precision_sweep` | `exp3_precision_sweep.csv` (FP16 vs INT8) |
-| `python -m benchmarks.oom_frontier` | `oom_frontier.json` (memory budgets) |
-| `python -m benchmarks.run_cache_comparison` | `exp1_layout_comparison.csv` (paged vs contiguous) |
-| `python -m benchmarks.run_block_size_sweep` | `exp2_block_size_sweep.csv` |
-| `python -m benchmarks.run_perplexity_eval --model gpt2 --text experiments/data/wikitext2_test.txt` | `exp3_perplexity.csv` |
+| What | Command | Reads |
+|---|---|---|
+| Figures 1–3 | `python scripts/make_figures.py` | `results/arch_sweep`, `results/precision_sweep`, `results/pre_fix`, `results/oom_frontier` |
+| Cache share / INT8 table, FP16 and INT8 fits, perplexity, paged vs contiguous | `python scripts/make_tables.py` | `results/precision_sweep`, `results/perplexity_eval`, `results/cache_comparison` |
+| Per-token memory model, uncorrected and corrected | `python scripts/check_memory_model.py` | `results/arch_sweep/arch_sweep.json` |
+| Tests | `python -m pytest -q` | — |
 
-Notebooks 04 and 05 work through the memory model. [STATUS.md](STATUS.md) lists which files are current and what is still open.
+`check_memory_model.py` exits non-zero if a reported memory-model value does not reproduce.
+
+### Rerunning the experiments (GPU)
+
+Install PyTorch with CUDA first ([pytorch.org](https://pytorch.org/get-started/locally/); tested on 2.11 with CUDA 12.8). Each runner overwrites its file in `results/`; pass `--output` to write elsewhere.
+
+| Experiment | Command | Writes |
+|---|---|---|
+| Memory model across architectures | `python -m experiments.arch_sweep` | `results/arch_sweep/arch_sweep.json` |
+| FP16 vs INT8 cache | `python -m experiments.run_precision_sweep` | `results/precision_sweep/exp3_precision_sweep.csv` |
+| OOM frontier under budgets | `python -m experiments.oom_frontier` | `results/oom_frontier/oom_frontier.json` |
+| Paged vs contiguous | `python -m experiments.run_cache_comparison` | `results/cache_comparison/exp1_layout_comparison.csv` |
+| Block-size sweep | `python -m experiments.run_block_size_sweep` | `results/block_size_sweep/exp2_block_size_sweep.csv` |
+| INT8 perplexity (one row per call; appends) | `python -m experiments.run_perplexity_eval --model gpt2 --text data/wikitext2_test.txt` | `results/perplexity_eval/exp3_perplexity.csv` |
+| Driver spill, no memory cap | `python -m experiments.wddm_spill` | `results/pre_fix/wddm_spill.json` |
+| Block-size noise, same commit | `python -m experiments.block_size_noise` | `results/block_size_sweep/noise_check.json` |
+
+Use `--help` on any runner to select a subset of the grid (for example `--seq-lens 512 --batches 1`).
+
+`exp3_perplexity.csv` row 3 is a 1,135-token test run on `data/eval_text.txt`. It is kept and marked in the `excluded` column; do not cite it.
+
+## Hardware and OS caveats
+
+- **One machine.** RTX 5070 Ti Laptop GPU (11.9 GB), driver 577.13, Windows 11, PyTorch 2.11 + CUDA 12.8.
+- **Windows WDDM sysmem fallback.** On Windows the NVIDIA driver can spill allocations past VRAM into host RAM over PCIe instead of raising out-of-memory. A run that should fail then "succeeds", only slower. `experiments/wddm_spill.py` records this.
+- **The OOM limit is enforced in software.** `oom_frontier.py` and `arch_sweep.py` cap PyTorch's allocator with `torch.cuda.set_per_process_memory_fraction`, so OOM is raised in-process before the driver fallback engages. Results are stated per budget (8–11.5 GB), not per device. The cap counts allocated bytes, not what the driver reserves.
+- **Peak memory is `torch.cuda.max_memory_allocated`.** It does not include allocator fragmentation or reserved-but-unused memory.
+- **Rerun tolerance.** Rerunning committed cells on this machine (October 2026) reproduced `cache_memory_mb` exactly and `peak_memory_mb` exactly on most cells, but some cells came out up to 1 MB off (e.g. INT8 512×1: 168.31 vs 167.31 committed). The unmodified original code gives the same new values, so the difference comes from the environment, not from the code.
+- **Timing columns are not comparable across runs.** Clocks are not locked and cells run in a fixed order. No latency claims are made.
