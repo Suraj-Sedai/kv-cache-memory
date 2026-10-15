@@ -8,7 +8,6 @@ Status:
 - **ok**: reproduces from the named source
 - **derived**: arithmetic on configuration constants or committed values, shown
 - **external**: a citation or a published model fact, not a measurement here
-- **PENDING**: the runner exists and is committed, but its output is not in `results/` yet
 
 Abbreviations:
 - `arch` = `results/arch_sweep/arch_sweep.json`
@@ -27,12 +26,19 @@ The memory model uses the integer activation coefficients, 3·d_model + 2·d_ff:
 live at the peak, counted in `census`. The general form is max(7·d_model, 3·d_model + 2·d_ff);
 every tested shape has d_ff ≥ 2·d_model.
 
-## Untraced: 2 numbers, both waiting on a committed runner
+## Untraced: 0
 
-| Line | Number | Missing | Runner |
-|---|---|---|---|
-| 51, 169 | "a decode step is roughly 0.7% arithmetic" | achievable FP16 throughput | `python -m experiments.matmul_peak` → `results/matmul_peak/matmul_peak.json`; T5 then gives the share per cell, the max over the sweep, and 2048×16 |
-| 55 | 32 MB (EFFICIENT, CUDNN) vs 4,888 MB (MATH) at 2048×16 | the output of the restored SDPA check | `python -m experiments.sdpa_backend_check` → `results/sdpa_backend_check/sdpa_backend_check.json` |
+Every printed number traces to a committed file. The last two were closed by the GPU runs at
+feb71b7: `results/matmul_peak/matmul_peak.json` (0.7%) and
+`results/sdpa_backend_check/sdpa_backend_check.json` (32 MB vs 4,888 MB).
+
+Wording notes (not numbers):
+- Lines 51 and 169: 0.7% is FLOPs at the *achievable large-matmul* throughput (50.82 TFLOP/s)
+  divided by the measured TPOT, so it is the share the arithmetic *would* take at that rate. It
+  is the maximum over the precision sweep (0.65% at 1024x32; range 0.03-0.65%; 2048x16 0.41%).
+- Line 179: FlashAttention is unavailable because this PyTorch build was not compiled with it
+  ("Torch was not compiled with flash attention", `sdpa_backend_check` run), not because of the
+  device architecture.
 
 ## Abstract and Introduction (lines 11–29)
 
@@ -62,7 +68,7 @@ every tested shape has d_ff ≥ 2·d_model.
 | 45 | 7113 vs 7086 MB | `exp3` / `oom` | 7112.57 / 7086.5 | ok |
 | 47 | 1 timed + 2 warmups, median of 20 | runners | `N_WARMUP = 3`, `N_MEASURE = 20` | ok |
 | 49 | amax/127; 512-token windows; 284,614 tokens | `run_perplexity_eval.py`, `ppl` | `fake_quant_per_token`; `ctx` 512; `n_tokens` | ok |
-| 51 | roughly 0.7% arithmetic | — | see Untraced | **PENDING** |
+| 51 | roughly 0.7% arithmetic | `exp3` + `results/matmul_peak/matmul_peak.json` | decode-step FLOPs / 50.82 TFLOP/s / `tpot_ms`: max 0.65% (1024×32) over 20 FP16 cells | ok; T5 |
 
 ## 3. A memory model (lines 55–80)
 
@@ -70,7 +76,7 @@ every tested shape has d_ff ≥ 2·d_model.
 |---|---|---|---|---|
 | 55 | 7086 / 7091 MB, 262,144 tokens, 0.058% | `oom` | `fp16.peak_mb` 8192×32 7086.5, 16384×16 7090.6 | ok; notebook 04 |
 | 55 | 524,288 tokens within 0.01% | `wddm` | FP16 8192×64 14008.6 vs 16384×32 14008.7 → 0.0007% (`oom` has only INT8 here: 0.038%) | ok |
-| 55 | 32 MB vs 4,888 MB | — | see Untraced | **PENDING** |
+| 55 | 32 MB (EFFICIENT, CUDNN) vs 4,888 MB (MATH), 2048×16 | `results/sdpa_backend_check/sdpa_backend_check.json` | `backends[].peak_workspace_mb`: 32.0, 32.0 vs 4888.4 | ok |
 | 57 | 27.25 KB, 161 MB, 2.42 MB, 1.5–4.5 GB | `arch` | baseline `slope_kb_per_token`, `intercept_mb`, `max_resid_mb`, `peaks` | ok |
 | 57 | 146 MB weights | derived | parameters × 2 B without the position table = 146.2 MiB (147.2 with it) | derived |
 | 57 | ~15 MB overhead | derived | 161 − 146 | derived |
@@ -134,7 +140,7 @@ every tested shape has d_ff ≥ 2·d_model.
 | Line | Number | Source | Key / row / column | Status |
 |---|---|---|---|---|
 | 165 | 11.9 GB | `wddm` | | ok |
-| 169 | roughly 0.7% arithmetic | — | see Untraced | **PENDING** |
+| 169 | roughly 0.7% arithmetic | as line 51 | | ok; T5 |
 | 169 | same commit, 1.18× throughput | `results/block_size_sweep/noise_check.json` | `max_over_min` 1.182 (1456.6 vs 1232.3) | ok |
 | 175 | 133 systems papers | [13] | | external |
 | 177 | vLLM default block size 16 | [10] | | external |
@@ -146,5 +152,5 @@ every tested shape has d_ff ≥ 2·d_model.
 
 | Item | Status |
 |---|---|
-| §5.4 paged throughput range (left out of the draft) | `exp1` gives paged/contiguous 0.32–0.77× (T4), from separate sweeps (`run_cache_comparison.py:165` loops cache_type outermost). `experiments/paired_layout_check.py` measures the interleaved ratio; result pending |
+| §5.4 paged throughput range (left out of the draft) | `exp1` gives paged/contiguous 0.32–0.77× (T4), from separate sweeps (`run_cache_comparison.py:165` loops cache_type outermost). Interleaved ABAB ×5 (`results/paired_layout_check/paired_layout_check.json`), median (range): 512×1 0.589 (0.556–0.739), 2048×1 0.652 (0.618–0.716), 2048×16 0.584 (0.447–0.592). exp1 at the same cells: 0.459, 0.372, 0.658 |
 | Editor's note "exp1 reports 1.35–2.3×" | no committed file gives it |
