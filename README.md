@@ -83,11 +83,11 @@ pip install -r requirements.txt
 | Per-token memory model, uncorrected and corrected | `python scripts/check_memory_model.py` | `results/arch_sweep/arch_sweep.json` |
 | Tests | `python -m pytest -q` | — |
 
-`check_memory_model.py` exits non-zero if a reported memory-model value does not reproduce.
+Both scripts exit non-zero if a reported value does not reproduce. To check a rerun, pass its output with `--against`: `python scripts/make_tables.py --against <rerun>.csv` (CSV runners; the file name must match the committed one) or `python scripts/check_memory_model.py --against <rerun>.json` (arch sweep). Memory columns are compared at ±1 MB.
 
 ### Rerunning the experiments (GPU)
 
-Install PyTorch with CUDA first ([pytorch.org](https://pytorch.org/get-started/locally/); tested on 2.11 with CUDA 12.8). Each runner overwrites its file in `results/`; pass `--output` to write elsewhere.
+Install PyTorch with CUDA first ([pytorch.org](https://pytorch.org/get-started/locally/); tested on 2.11 with CUDA 12.8). Each runner overwrites its file in `results/`; pass `--output` to write elsewhere. Every runner also writes `<output>.env.json` (torch, CUDA, driver, GPU, git commit, package versions); the perplexity runner appends one line per row to `<output>.env.jsonl`. Committed results that predate this have no env file.
 
 | Experiment | Command | Writes |
 |---|---|---|
@@ -110,5 +110,5 @@ Use `--help` on any runner to select a subset of the grid (for example `--seq-le
 - **Windows WDDM sysmem fallback.** On Windows the NVIDIA driver can spill allocations past VRAM into host RAM over PCIe instead of raising out-of-memory. A run that should fail then "succeeds", only slower. `experiments/wddm_spill.py` records this.
 - **The OOM limit is enforced in software.** `oom_frontier.py` and `arch_sweep.py` cap PyTorch's allocator with `torch.cuda.set_per_process_memory_fraction`, so OOM is raised in-process before the driver fallback engages. Results are stated per budget (8–11.5 GB), not per device. The cap counts allocated bytes, not what the driver reserves.
 - **Peak memory is `torch.cuda.max_memory_allocated`.** It does not include allocator fragmentation or reserved-but-unused memory.
-- **Rerun tolerance.** Rerunning committed cells on this machine (October 2026) reproduced `cache_memory_mb` exactly and `peak_memory_mb` exactly on most cells, but some cells came out up to 1 MB off (e.g. INT8 512×1: 168.31 vs 167.31 committed). The unmodified original code gives the same new values, so the difference comes from the environment, not from the code.
+- **Rerun tolerance.** memory values reproduce to within 1 MB across environments; observed differences are allocator granularity. Rerunning committed cells on this machine (October 2026) reproduced `cache_memory_mb` exactly and `peak_memory_mb` exactly on most cells; the largest difference was INT8 512×1, 168.31 vs 167.31 MB committed. The unmodified original code gives the same new values. Perplexity rows reproduce exactly.
 - **Timing columns are not comparable across runs.** Clocks are not locked and cells run in a fixed order. No latency claims are made.

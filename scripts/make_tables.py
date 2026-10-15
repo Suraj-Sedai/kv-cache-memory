@@ -7,15 +7,27 @@
 
 The memory-model numbers (0.08%, 11.00 KB/token, ...) are in scripts/check_memory_model.py.
 
+Memory values reproduce to within MB_TOL = 1 MB across environments, so reported MB values and
+rerun comparisons are checked at +/-1 MB; percentages are checked at their printed precision.
+
 Run:  python scripts/make_tables.py
+      python scripts/make_tables.py --against path/to/rerun.csv
+        compares peak/cache memory of a rerun CSV with the committed CSV of the same name, +/-1 MB
+Exit status 1 if a reported value or a rerun comparison fails.
 """
+import argparse
+import glob
 import os
+import sys
 
 import numpy as np
 import pandas as pd
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 R = os.path.join(REPO, "results")
+MB_TOL = 1.0
+KEYS = ["cache_type", "seq_len", "batch", "block_size"]
+MEM = ["peak_memory_mb", "cache_memory_mb"]
 
 
 def table1_2():
@@ -74,7 +86,71 @@ def table4():
           f" peak memory differs by at most {peak.abs().max():.1f}%")
 
 
+def check_reported():
+    """Values the paper prints, recomputed from results/precision_sweep (decode length 60)."""
+    d = pd.read_csv(os.path.join(R, "precision_sweep", "exp3_precision_sweep.csv")).set_index(
+        ["cache_type", "seq_len", "batch"])
+    f = lambda s, b, c: d.loc[("paged_fp16", s, b), c]
+    q = lambda s, b, c: d.loc[("paged_int8", s, b), c]
+    share = lambda s, b: 100 * f(s, b, "cache_memory_mb") / f(s, b, "peak_memory_mb")
+    cut = lambda s, b: 100 * (f(s, b, "peak_memory_mb") - q(s, b, "peak_memory_mb")) / f(s, b, "peak_memory_mb")
+    checks = [  # (claim, recomputed, reported, tolerance)
+        ("512x1 cache 9 MB", f(512, 1, "cache_memory_mb"), 9, MB_TOL),
+        ("512x1 peak 172 MB", f(512, 1, "peak_memory_mb"), 172, MB_TOL),
+        ("8192x32 cache 4128 MB", f(8192, 32, "cache_memory_mb"), 4128, MB_TOL),
+        ("8192x32 peak 7113 MB", f(8192, 32, "peak_memory_mb"), 7113, MB_TOL),
+        ("2048x16 post-fix peak 1039 MB", f(2048, 16, "peak_memory_mb"), 1039, MB_TOL),
+        ("share 512x1 5.2%", share(512, 1), 5.2, 0.05),
+        ("share 1024x8 35.5%", share(1024, 8), 35.5, 0.05),
+        ("share 2048x16 50.8%", share(2048, 16), 50.8, 0.05),
+        ("share 8192x32 58.0%", share(8192, 32), 58.0, 0.05),
+        ("INT8 peak cut 512x1 2.7%", cut(512, 1), 2.7, 0.05),
+        ("INT8 peak cut 1024x8 15.9%", cut(1024, 8), 15.9, 0.05),
+        ("INT8 peak cut 2048x16 22.8%", cut(2048, 16), 22.8, 0.05),
+        ("INT8 peak cut 8192x32 26.0%", cut(8192, 32), 26.0, 0.05),
+    ]
+    print("Reported values")
+    bad = 0
+    for claim, got, rep, tol in checks:
+        ok = abs(got - rep) <= tol
+        bad += not ok
+        print(f"  {'PASS' if ok else 'FAIL'}  {claim:<32} recomputed {got:.3f}")
+    return bad
+
+
+def compare(path):
+    """Rerun CSV vs the committed CSV with the same file name, memory columns, +/-MB_TOL."""
+    name = os.path.basename(path)
+    ref = [p for p in glob.glob(os.path.join(R, "*", name)) if "pre_fix" not in p]
+    if len(ref) != 1:
+        sys.exit(f"no unique committed results/*/{name} to compare against")
+    new, old = pd.read_csv(path, dtype={"block_size": str}), pd.read_csv(ref[0], dtype={"block_size": str})
+    keys = [k for k in KEYS if k in new and k in old]
+    m = new.merge(old, on=keys, suffixes=("_new", "_old"))
+    print()
+    print(f"Rerun {path} vs {os.path.relpath(ref[0], REPO)}: {len(m)} matching cells, tolerance +/-{MB_TOL:g} MB")
+    bad = 0
+    for _, r in m.iterrows():
+        for c in MEM:
+            a, b = r[c + "_new"], r[c + "_old"]
+            if pd.isna(a) and pd.isna(b):
+                continue
+            ok = abs(a - b) <= MB_TOL
+            bad += not ok
+            print(f"  {'ok  ' if ok else 'FAIL'}  {tuple(r[k] for k in keys)}  {c:<16} "
+                  f"rerun {a:9.2f}  committed {b:9.2f}  diff {a - b:+.2f}")
+    return bad
+
+
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Print the paper tables from committed results.")
+    ap.add_argument("--against", nargs="*", default=[], help="rerun CSV(s) to compare with the committed ones")
+    args = ap.parse_args()
     table1_2()
     table3()
     table4()
+    print()
+    failed = check_reported()
+    for p in args.against:
+        failed += compare(p)
+    sys.exit(1 if failed else 0)
