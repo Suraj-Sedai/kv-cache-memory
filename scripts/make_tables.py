@@ -7,6 +7,7 @@
   table 5  decode-step FLOPs and arithmetic share of TPOT  <- results/precision_sweep, results/matmul_peak
   table 6  pre-fix ledger at 2048x16 and across the grid  <- results/pre_fix/exp3_precision_sweep_e383030.csv
   table 7  effective ceiling below each enforced budget    <- results/oom_frontier, results/pre_fix/wddm_spill.json
+  table 8  withdrawn block-size ranking, cells won         <- results/pre_fix/exp2_*, results/block_size_sweep
 
 The memory-model numbers (0.08%, 11.00 KB/token, ...) are in scripts/check_memory_model.py.
 
@@ -181,6 +182,20 @@ def table7():
         print(line)
 
 
+def table8():
+    """Withdrawn block-size ranking: which block size wins each (seq_len, batch) cell."""
+    print("Table 8: block size with the highest throughput per (seq_len, batch) cell (withdrawn claim)")
+    for name, path in [("13fbfae (the ranking the paper withdraws)", ("pre_fix", "exp2_block_size_sweep_13fbfae.csv")),
+                       ("e383030", ("pre_fix", "exp2_block_size_sweep_e383030.csv")),
+                       ("current", ("block_size_sweep", "exp2_block_size_sweep.csv"))]:
+        d = pd.read_csv(os.path.join(R, *path))
+        if "status" in d:
+            d = d[d.status == "ok"]
+        wins = d.loc[d.groupby(["seq_len", "batch"]).throughput.idxmax()].block_size.value_counts().sort_index()
+        mean = d.groupby("block_size").throughput.mean().round(1)
+        print(f"  {name}: cells won {dict(wins)} of {wins.sum()}; mean tok/s by block {dict(mean)}")
+
+
 def table4():
     d = pd.read_csv(os.path.join(R, "cache_comparison", "exp1_layout_comparison.csv"))
     d = d[d.status == "ok"]
@@ -263,6 +278,8 @@ if __name__ == "__main__":
     table6()
     print()
     table7()
+    print()
+    table8()
     print()
     failed = check_reported()
     for p in args.against:
