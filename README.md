@@ -104,6 +104,7 @@ Install PyTorch with CUDA first ([pytorch.org](https://pytorch.org/get-started/l
 | Activation tensors live at peak | `python -m experiments.activation_census` | `results/activation_census/activation_census.json` |
 | Achievable FP16 matmul throughput | `python -m experiments.matmul_peak` | `results/matmul_peak/matmul_peak.json` |
 | Paged vs contiguous, interleaved ABAB | `python -m experiments.paired_layout_check` | `results/paired_layout_check/paired_layout_check.json` |
+| Paged read() gather vs the paged-contiguous TPOT gap | `python -m experiments.gather_cost` | `results/gather_cost/gather_cost.json` |
 
 Use `--help` on any runner to select a subset of the grid (for example `--seq-lens 512 --batches 1`).
 
