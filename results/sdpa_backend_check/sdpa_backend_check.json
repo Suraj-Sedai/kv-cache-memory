@@ -1,0 +1,42 @@
+{
+  "batch": 16,
+  "heads": 8,
+  "seq_len": 2048,
+  "head_dim": 64,
+  "dtype": "float16",
+  "is_causal": true,
+  "materialised_score_matrix_mb": 1024.0,
+  "peak_mb_above_qkv": "max_memory_allocated - memory_allocated before the call",
+  "backends": [
+    {
+      "backend": "default (what exp1 used)",
+      "peak_workspace_mb": 32.0,
+      "available": true,
+      "error": null
+    },
+    {
+      "backend": "MATH",
+      "peak_workspace_mb": 4888.4,
+      "available": true,
+      "error": null
+    },
+    {
+      "backend": "EFFICIENT_ATTENTION",
+      "peak_workspace_mb": 32.0,
+      "available": true,
+      "error": null
+    },
+    {
+      "backend": "FLASH_ATTENTION",
+      "peak_workspace_mb": null,
+      "available": false,
+      "error": "RuntimeError: No available kernel. Aborting execution."
+    },
+    {
+      "backend": "CUDNN_ATTENTION",
+      "peak_workspace_mb": 32.0,
+      "available": true,
+      "error": null
+    }
+  ]
+}

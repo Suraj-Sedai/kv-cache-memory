@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "gpu": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+    "driver_version": "577.13",
+    "driver_model": "WDDM",
+    "physical_memory_mb": 12226.6,
+    "torch": "2.11.0+cu128",
+    "cuda": "12.8",
+    "os": "Windows-10-10.0.26200-SP0",
+    "commit": "8251fad-dirty",
+    "software_cap": "none (set_per_process_memory_fraction(1.0))",
+    "timestamp": "2026-10-15T12:03:19",
+    "verdict": "2 cell(s) completed with peak allocated above physical memory (12227 MB): the driver spilled instead of raising OOM"
+  },
+  "cells": [
+    {
+      "seq_len": 8192,
+      "batch": 64,
+      "dtype": "fp16",
+      "status": "ok",
+      "peak_allocated_mb": 14008.6,
+      "peak_reserved_mb": 16270.0,
+      "cache_mb": 8208.0,
+      "wall_s": 88.91,
+      "allocated_exceeds_physical": true
+    },
+    {
+      "seq_len": 8192,
+      "batch": 64,
+      "dtype": "int8",
+      "status": "ok",
+      "peak_allocated_mb": 10328.9,
+      "peak_reserved_mb": 15304.0,
+      "cache_mb": 4232.2,
+      "wall_s": 26.24,
+      "allocated_exceeds_physical": false
+    },
+    {
+      "seq_len": 16384,
+      "batch": 32,
+      "dtype": "fp16",
+      "status": "ok",
+      "peak_allocated_mb": 14008.7,
+      "peak_reserved_mb": 16278.0,
+      "cache_mb": 8200.0,
+      "wall_s": 78.17,
+      "allocated_exceeds_physical": true
+    },
+    {
+      "seq_len": 16384,
+      "batch": 32,
+      "dtype": "int8",
+      "status": "ok",
+      "peak_allocated_mb": 10332.8,
+      "peak_reserved_mb": 15316.0,
+      "cache_mb": 4228.1,
+      "wall_s": 32.69,
+      "allocated_exceeds_physical": false
+    }
+  ]
+}

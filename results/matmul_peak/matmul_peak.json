@@ -1,0 +1,25 @@
+{
+  "dtype": "float16",
+  "warmup": 10,
+  "iters": 20,
+  "sizes": [
+    {
+      "n": 4096,
+      "flops": 137438953472,
+      "median_ms": 2.7229,
+      "min_ms": 2.5883,
+      "max_ms": 2.8301,
+      "tflops": 50.48
+    },
+    {
+      "n": 8192,
+      "flops": 1099511627776,
+      "median_ms": 21.6372,
+      "min_ms": 21.1391,
+      "max_ms": 22.057,
+      "tflops": 50.82
+    }
+  ],
+  "achievable_tflops": 50.82,
+  "achievable_from_n": 8192
+}
