@@ -17,7 +17,6 @@ build/
 *.egg-info/
 *.egg
 .eggs/
-document/
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -78,7 +77,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
-.dist/
 
 
 # Secrets / environment configs
@@ -91,5 +89,4 @@ docs/
 CLAUDE.md
 
 # Local-only paper draft (kept private, not shared)
-paper/draft.md
 paper.md
