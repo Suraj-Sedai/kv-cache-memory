@@ -18,6 +18,7 @@ Printed below (numbered by this script, not the paper):
   table 7  effective ceiling below each enforced budget    <- results/oom_frontier, results/pre_fix/wddm_spill.json
   table 8  withdrawn block-size ranking, cells won         <- results/pre_fix/exp2_*, results/block_size_sweep
   table 9  pitfall-2 batch effect; interleaved vs unpaired <- results/pre_fix/exp1_*, results/paired_layout_check, exp1
+  table 10 paged read() gather vs the paged-contiguous gap <- results/gather_cost/gather_cost.json (5 reps), _r15 (15 reps)
 
 The memory-model numbers (0.08%, 11.00 KB/token, ...) are in scripts/check_memory_model.py.
 
@@ -248,6 +249,28 @@ def table9():
           f"largest unpaired-vs-interleaved disagreement {max(drift):.2f}x")
 
 
+def table10():
+    """Paged read() gather time vs the paged-contiguous TPOT gap, per cell: ratio of medians with the
+    IQRs of gather and gap, and instrumentation overhead as a ratio of median TPOTs. Recomputed from
+    the per-rep records with experiments/gather_cost.py's summarize(), so the committed JSONs written
+    before that summary existed give the same statistic."""
+    sys.path.insert(0, REPO)
+    from experiments.gather_cost import summarize
+    print("Table 10: paged read() gather vs the paged-contiguous TPOT gap (ms per decode step)")
+    for name in ["gather_cost.json", "gather_cost_r15.json"]:
+        d = json.load(open(os.path.join(R, "gather_cost", name)))
+        print(f"  {name} ({d['reps']} reps):")
+        for c in d["cells"]:
+            s = summarize(c["reps"])
+            flags = [f for f, on in [("SHARE > 1.0", s["share_gt_1"]), ("OVERHEAD > 1.10", s["instrumentation_overhead_ratio"] > 1.10)] if on]
+            print(f"    {c['seq_len']}x{c['batch']}: gather {s['median_gather_ms_per_step']:.3f} "
+                  f"(IQR {s['gather_iqr_ms'][0]:.3f}-{s['gather_iqr_ms'][1]:.3f}), gap {s['median_gap_ms']:.3f} "
+                  f"(IQR {s['gap_iqr_ms'][0]:.3f}-{s['gap_iqr_ms'][1]:.3f}, {'resolved' if s['gap_resolved'] else 'not resolved'}); "
+                  f"ratio of medians {s['gather_share_of_gap']:.2f}; overhead {s['instrumentation_overhead_ratio']:.3f}x; "
+                  f"share > 1 in {s['reps_with_share_gt_1']}/{len(c['reps'])} reps"
+                  + (f"  ** {', '.join(flags)} **" if flags else ""))
+
+
 def table4():
     d = pd.read_csv(os.path.join(R, "cache_comparison", "exp1_layout_comparison.csv"))
     d = d[d.status == "ok"]
@@ -432,6 +455,8 @@ if __name__ == "__main__":
     table8()
     print()
     table9()
+    print()
+    table10()
     print()
     failed = check_reported()
     print()
