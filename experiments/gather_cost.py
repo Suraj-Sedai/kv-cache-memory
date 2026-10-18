@@ -11,9 +11,12 @@ Per cell, in one process, with one model, weights and prompt, each rep runs in o
   A  contiguous generation -> TPOT (tpot_p50_ms)
   B  paged generation, uninstrumented -> TPOT
   C  paged generation with CUDA events around every read() -> gather ms per decode step
-     (sum over layers, median over the decode steps)
+     (sum over layers, median over the decode steps), plus that run's own TPOT
 A and B are the same generation path as run_cache_comparison.py (make_cache, run_one). Timing
-is kept off B so the instrumentation does not inflate TPOT_paged.
+is kept off B so the instrumentation does not inflate TPOT_paged. The share uses A and B's TPOTs;
+C's TPOT is reported only to show the instrumentation overhead (tpot_paged_instrumented_ms -
+tpot_paged_ms). A share above 1.0 (gather longer than the whole gap) is flagged per rep and per
+cell: it means the events overstate the gather or the gap is noise-sized.
 
 The events bracket the whole read() call on the stream, so the gather time includes the index
 arithmetic (paged.py _index) and any launch gaps between those kernels, not only the copy.
@@ -48,7 +51,8 @@ def tpot(model, mc, layout, prompt):
 
 
 def gather_per_step(model, mc, prompt):
-    """Median over decode steps of the summed read() time across layers (ms)."""
+    """Median over decode steps of the summed read() time across layers (ms), the step count,
+    and this instrumented run's TPOT."""
     cache = make_cache("paged", mc, prompt.size(0), prompt.size(1) + DECODE_LEN, "cuda",
                        next(model.parameters()).dtype)
     read, events = cache.read, []
@@ -64,12 +68,12 @@ def gather_per_step(model, mc, prompt):
         return out
 
     cache.read = timed_read
-    run_one(model, mc, cache, prompt)
+    t = run_one(model, mc, cache, prompt).metrics.tpot_p50_ms
     torch.cuda.synchronize()
     per_step = defaultdict(float)
     for step, start, end in events:
         per_step[step] += start.elapsed_time(end)
-    return statistics.median(per_step.values()), len(per_step)
+    return statistics.median(per_step.values()), len(per_step), t
 
 
 def main():
@@ -98,31 +102,45 @@ def main():
         for rep in range(args.reps):
             t_c = tpot(model, mc, "contiguous", prompt)
             t_p = tpot(model, mc, "paged", prompt)
-            g, n_steps = gather_per_step(model, mc, prompt)
+            g, n_steps, t_pi = gather_per_step(model, mc, prompt)
             gap = t_p - t_c
+            share = g / gap if gap > 0 else None
             reps.append(dict(rep=rep + 1, tpot_contiguous_ms=round(t_c, 4), tpot_paged_ms=round(t_p, 4),
+                             tpot_paged_instrumented_ms=round(t_pi, 4),
+                             instrumentation_overhead_ms=round(t_pi - t_p, 4),
                              gap_ms=round(gap, 4), gather_ms_per_step=round(g, 4), decode_steps=n_steps,
-                             gather_share_of_gap=round(g / gap, 4) if gap > 0 else None))
-            print(f"{seq_len}x{batch} rep {rep + 1}: {reps[-1]}")
+                             gather_share_of_gap=round(share, 4) if share is not None else None,
+                             share_gt_1=share is not None and share > 1.0))
+            print(f"{seq_len}x{batch} rep {rep + 1}: {reps[-1]}"
+                  + ("  ** SHARE > 1.0 **" if reps[-1]["share_gt_1"] else ""))
         shares = [r["gather_share_of_gap"] for r in reps if r["gather_share_of_gap"] is not None]
         med = lambda k: round(statistics.median(r[k] for r in reps), 4)
         row = dict(seq_len=seq_len, batch=batch, reps=reps,
                    median_tpot_contiguous_ms=med("tpot_contiguous_ms"), median_tpot_paged_ms=med("tpot_paged_ms"),
+                   median_tpot_paged_instrumented_ms=med("tpot_paged_instrumented_ms"),
+                   median_instrumentation_overhead_ms=med("instrumentation_overhead_ms"),
                    median_gap_ms=med("gap_ms"), median_gather_ms_per_step=med("gather_ms_per_step"),
                    median_gather_share_of_gap=round(statistics.median(shares), 4) if shares else None,
                    min_share=min(shares) if shares else None, max_share=max(shares) if shares else None,
-                   reps_with_nonpositive_gap=sum(r["gather_share_of_gap"] is None for r in reps))
+                   reps_with_nonpositive_gap=sum(r["gather_share_of_gap"] is None for r in reps),
+                   reps_with_share_gt_1=sum(r["share_gt_1"] for r in reps))
+        row["share_gt_1"] = row["median_gather_share_of_gap"] is not None and row["median_gather_share_of_gap"] > 1.0
         rows.append(row)
         print(f"{seq_len}x{batch}: gather {row['median_gather_ms_per_step']} ms/step, gap "
               f"{row['median_gap_ms']} ms -> share {row['median_gather_share_of_gap']} "
-              f"(range {row['min_share']}-{row['max_share']})\n")
+              f"(range {row['min_share']}-{row['max_share']}); TPOT paged {row['median_tpot_paged_ms']} ms, "
+              f"instrumented {row['median_tpot_paged_instrumented_ms']} ms"
+              + (f"\n  ** SHARE > 1.0: median {row['median_gather_share_of_gap']}, "
+                 f"{row['reps_with_share_gt_1']}/{len(reps)} reps **" if row["reps_with_share_gt_1"] else "") + "\n")
         del model
         torch.cuda.empty_cache()
 
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     with open(args.output, "w") as f:
         json.dump(dict(order="per rep: contiguous TPOT, paged TPOT, paged instrumented",
-                       share="gather_ms_per_step / (tpot_paged - tpot_contiguous)",
+                       share="gather_ms_per_step (instrumented run) / (tpot_paged - tpot_contiguous) (uninstrumented runs)",
+                       flag="share_gt_1 marks share > 1.0",
+                       cells_with_share_gt_1=[f"{r['seq_len']}x{r['batch']}" for r in rows if r["reps_with_share_gt_1"]],
                        reps=args.reps, warmup=args.warmup, seed=args.seed, decode_len=DECODE_LEN,
                        cells=rows), f, indent=2)
     print(f"wrote {args.output}")
