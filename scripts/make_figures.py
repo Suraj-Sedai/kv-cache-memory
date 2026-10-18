@@ -2,7 +2,8 @@
 
   fig1_memory_slope   measured vs predicted per-token memory slope, six architectures
                       (GPT-2 small held out, integer coefficients), and the prediction error
-                      with the cache term uncorrected and corrected (x1040/1024)
+                      with the cache term over prompt tokens (uncorrected) and over allocated
+                      slots, ceil((L+D)/P)*P (corrected)
                       <- results/arch_sweep/arch_sweep.json
   fig2_cache_share    KV cache share of peak memory before / after the LM-head fix
                       (FP16 paged, batch 16)
@@ -138,9 +139,9 @@ def figure1():
     y = np.arange(len(df))
     h = 0.38
     axR.barh(y + h / 2, df.err_uncorrected_pct, height=h - 0.06, color=ORANGE,
-             label="uncorrected cache term (2·L·d·2 B)")
+             label="uncorrected: prompt tokens only")
     axR.barh(y - h / 2, df.err_corrected_pct, height=h - 0.06, color=BLUE,
-             label=f"corrected (×{slots}/{L})")
+             label="corrected: allocated slots")
     axR.axvline(0, color=INK_3, lw=0.6)
     for yi, r in zip(y, df.itertuples()):
         for val, off in ((r.err_uncorrected_pct, h / 2), (r.err_corrected_pct, -h / 2)):
