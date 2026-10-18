@@ -73,7 +73,7 @@ f8aa452: `results/matmul_peak/matmul_peak.json` (decode arithmetic 0.03–0.65%)
 | 57 | 27.25 KB, 161 MB, 2.42 MB, 1.5–4.5 GB | `arch` | baseline `slope_kb_per_token`, `intercept_mb`, `max_resid_mb`, `peaks` | ok |
 | 57 | 146 MB weights | derived | parameters × 2 B without the position table = 146.2 MiB (147.2 with it) | derived |
 | 57 | ~15 MB overhead | derived | 161 − 146 | derived |
-| 59 | 16.00 KB; 1032 → 1040; 1.015625; 16.25 KB | derived | 2·8·512·2 B; ceil((1024+8)/16)·16 (`src/memory_model.py`) | derived; CMM |
+| 59 | 16.00 KB; 1040 slots; 16.25 KB; 528 slots, 16.5 KB at L = 512 | derived | 2·8·512·2 B; ceil((1024+8)/16)·16, ceil((512+8)/16)·16 (`src/memory_model.py` `allocated_slots`) | derived; CMM |
 | 61 | 11.01 / 11.00 / 11.04 KB | `arch` | slope − corrected cache: 11.009, 11.000, 11.036 | ok; CMM |
 | 61 | 14.03, 18.99 | `arch` | 14.030, 18.988 | ok; CMM |
 | 63 | 3.03 and 2.00 tensors | `arch` | free fit a = 3.030, b = 1.997 | ok; CMM (validation) |

@@ -25,7 +25,7 @@ bytes per token = ( 2 · n_layers · d_model · c   +   3 · d_model + 2 · d_ff
                     └──────── KV cache ────────┘     └──── activations ────┘
 ```
 
-The cache is kept for every layer. Activations are not: each layer's temporaries are freed before the next layer runs, so the activation term stays flat as the model gets deeper (11.01, 11.00, 11.04 KB/token at 4, 8, 16 layers). `c = 1040/1024` accounts for decode tokens and 16-token pages.
+The cache is kept for every layer. Activations are not: each layer's temporaries are freed before the next layer runs, so the activation term stays flat as the model gets deeper (11.01, 11.00, 11.04 KB/token at 4, 8, 16 layers). The cache term counts allocated slots, ceil((L + D)/P)·P per sequence (1040 for the arch sweep's L = 1024, D = 8, P = 16), not prompt tokens.
 
 Built from five model shapes, the formula predicts GPT-2 small, a shape it never saw, at 53.06 KB/token. Measured: 53.08 (0.03% off). Worst error across all six shapes: 0.08%.
 
