@@ -19,6 +19,7 @@ Abbreviations:
 - `ppl` = `results/perplexity_eval/exp3_perplexity.csv`
 - `wddm` = `results/pre_fix/wddm_spill.json`
 - `census` = `results/activation_census/activation_census.json`
+- `gather` = `results/gather_cost/gather_cost_r15.json` (15 reps; `gather_cost.json` is the 5-rep run)
 - `T<n>` = `scripts/make_tables.py` Table n
 - `CMM` = `scripts/check_memory_model.py`
 
@@ -133,6 +134,10 @@ f8aa452: `results/matmul_peak/matmul_peak.json` (decode arithmetic 0.03–0.65%)
 
 | Line | Number | Source | Key / row / column | Status |
 |---|---|---|---|---|
+| 161 (draft) | read() interval 5.87 ms/step (IQR 5.78–5.92) vs gap 4.11 ms (IQR 3.88–5.08) at 2048×16; ratio of medians 1.43; above the gap in 15/15 reps | `gather` | 2048×16 `reps[].gather_ms_per_step`, `reps[].gap_ms`, `reps[].share_gt_1`; median and inclusive-quartile IQR | ok; T10 |
+| 161 (draft) | batch 1: 0.90 of 1.37 ms (0.66) at 512; 1.21 of 2.74 ms (0.44) at 2048; gap IQRs 1.30–1.96, 1.63–3.08 | `gather` | 512×1, 2048×1, same keys | ok; T10 |
+| 161 (draft) | instrumentation moves TPOT 0.89× to 1.15× | `gather` | median `tpot_paged_instrumented_ms` / median `tpot_paged_ms`: 1.133, 0.892, 1.151 | ok; T10 |
+| 161 (draft) | 5-rep run: ratio 1.08 at 2048×16 (gap 5.42 ms, read() 5.84 ms) | `results/gather_cost/gather_cost.json` | 2048×16, same keys | ok; T10 |
 | 165 | 11.9 GB | `wddm` | | ok |
 | 169 | same commit, 1.18× throughput | `results/block_size_sweep/noise_check.json` | `max_over_min` 1.182 (1456.6 vs 1232.3) | ok |
 | 175 | 133 systems papers | [13] | | external |
