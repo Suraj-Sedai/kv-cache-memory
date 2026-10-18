@@ -29,7 +29,7 @@ every tested shape has d_ff ≥ 2·d_model.
 ## Untraced: 0
 
 Every printed number traces to a committed file. The last two were closed by the GPU runs at
-feb71b7: `results/matmul_peak/matmul_peak.json` (decode arithmetic 0.03–0.65%) and
+f8aa452: `results/matmul_peak/matmul_peak.json` (decode arithmetic 0.03–0.65%) and
 `results/sdpa_backend_check/sdpa_backend_check.json` (32 MB vs 4,888 MB).
 
 ## Abstract and Introduction (lines 11–29)

@@ -7,7 +7,7 @@
     "torch": "2.11.0+cu128",
     "cuda": "12.8",
     "os": "Windows-10-10.0.26200-SP0",
-    "commit": "8251fad-dirty",
+    "commit": "4b56d3e-dirty",
     "software_cap": "none (set_per_process_memory_fraction(1.0))",
     "timestamp": "2026-10-15T12:03:19",
     "verdict": "2 cell(s) completed with peak allocated above physical memory (12227 MB): the driver spilled instead of raising OOM"
