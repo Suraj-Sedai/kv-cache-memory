@@ -147,6 +147,16 @@ f8aa452: `results/matmul_peak/matmul_peak.json` (decode arithmetic 0.03–0.65%)
 | 185 | "roughly 1.2 times model memory" | [2] | | external |
 | 185 | 11.01, 11.00, 11.04 KB at 4/8/16 layers; 0.08% | `arch` | | ok; CMM |
 
+## Figure captions (draft, not yet in paper.md)
+
+| Figure | Number | Source | Key / row / column | Status |
+|---|---|---|---|---|
+| 1 | corrected error at most 0.08%; uncorrected −0.68% to −1.23% | `arch` | CMM integer coefficients, corrected vs uncorrected blocks: max \|error\| 0.083%; −0.675% (8L/512d/4096ff) to −1.231% (16L/512d/2048ff) | ok; CMM, fig 1 |
+| 1 | 1040 slots for L = 1024, D = 8, P = 16 | derived | ceil((1024+8)/16)·16 (`src/memory_model.py` `allocated_slots`) | derived; CMM |
+| 2 | before 10.5–13.3% (seq 512–4096), 8192 OOM | `exp3-pre` | `paged_fp16`, batch 16, `cache_memory_mb / peak_memory_mb`: 12.87, 13.16, 13.34, 10.53; 8192 `status` oom | ok; fig 2 |
+| 2 | after 37.0–56.7% (seq 512–8192) | `exp3` | `paged_fp16`, batch 16: 37.02, 44.85, 50.82, 54.58, 56.71 | ok; fig 2 |
+| 3 | six outlined cells; budgets 8–11.5 GB | `oom` | 6 FRONTIER rows; budgets 8, 9, 10, 11, 11.5 | ok; fig 3 |
+
 ## Not printed, still open
 
 | Item | Status |
