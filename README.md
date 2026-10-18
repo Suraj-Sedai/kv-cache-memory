@@ -62,11 +62,12 @@ experiments/         one runner per experiment; every runner takes --help and --
 results/<runner>/    committed outputs of each runner
 results/pre_fix/     outputs from before the four fixes, with a README mapping each to its bug
 scripts/             make_figures.py, make_tables.py, check_memory_model.py (no GPU needed)
-figures/             written only by scripts/make_figures.py
+figures/             written only by scripts/make_figures.py (PDF for the paper, PNG for this README)
 notebooks/           04 memory model and OOM frontier, 05 architecture sweep
 data/                WikiText-2 test set, short eval text
 tests/               56 tests; paged and contiguous must produce identical tokens
 paper/NUMBERS.md     every number in the paper traced to its results file and key/row/column
+paper/tables/        LaTeX (booktabs) tables, written only by scripts/make_tables.py
 ```
 
 ## Reproduce
@@ -80,11 +81,11 @@ pip install -r requirements.txt
 | What | Command | Reads |
 |---|---|---|
 | Figures 1–3 | `python scripts/make_figures.py` | `results/arch_sweep`, `results/precision_sweep`, `results/pre_fix`, `results/oom_frontier` |
-| Cache share / INT8 table, FP16 and INT8 fits, perplexity, paged vs contiguous | `python scripts/make_tables.py` | `results/precision_sweep`, `results/perplexity_eval`, `results/cache_comparison` |
+| Paper Table 1 (`paper/tables/table1.tex`); cache share / INT8 table, FP16 and INT8 fits, perplexity, paged vs contiguous | `python scripts/make_tables.py` | `results/arch_sweep`, `results/precision_sweep`, `results/perplexity_eval`, `results/cache_comparison` |
 | Per-token memory model, uncorrected and corrected | `python scripts/check_memory_model.py` | `results/arch_sweep/arch_sweep.json` |
 | Tests | `python -m pytest -q` | — |
 
-Both scripts exit non-zero if a reported value does not reproduce. To check a rerun, pass its output with `--against`: `python scripts/make_tables.py --against <rerun>.csv` (CSV runners; the file name must match the committed one) or `python scripts/check_memory_model.py --against <rerun>.json` (arch sweep). Memory columns are compared at ±1 MB.
+`python scripts/make_figures.py && python scripts/make_tables.py` regenerates `figures/` and `paper/tables/`; with the pinned matplotlib, a rerun is byte-identical. Both scripts exit non-zero if a reported value does not reproduce. To check a rerun, pass its output with `--against`: `python scripts/make_tables.py --against <rerun>.csv` (CSV runners; the file name must match the committed one) or `python scripts/check_memory_model.py --against <rerun>.json` (arch sweep). Memory columns are compared at ±1 MB.
 
 ### Rerunning the experiments (GPU)
 
