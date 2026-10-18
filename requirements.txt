@@ -5,7 +5,7 @@
 torch==2.11.0
 numpy==2.1.2
 pandas==2.3.3
-matplotlib==3.10.7
+matplotlib==3.10.9   # figures/ are byte-identical only under this exact version
 transformers==5.6.2
 psutil==7.1.3
 pytest==9.0.2
