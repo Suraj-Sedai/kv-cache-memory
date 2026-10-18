@@ -12,9 +12,9 @@ NOTE: decode on this GPU is launch-bound (throughput CV up to 42.59% in exp1,
 TPOT-vs-block_size may stay within the noise. A flat TPOT curve here is the known
 launch-bound regime, not a new bug.
 
-PORTED to the batched cache interface (fceab20). The committed CSV
+PORTED to the batched cache interface (d1207bf). The committed CSV
 (results/block_size_sweep/exp2_block_size_sweep.csv) was rerun after that port, the SDPA
-switch and the lm_head slice (committed in ae0cb58). frag_ratio is waste over TOTAL
+switch and the lm_head slice (committed in d4f4678). frag_ratio is waste over TOTAL
 allocation, not waste over the last block; the pre-port files in results/pre_fix/ use the
 old definition and are not comparable.
 """

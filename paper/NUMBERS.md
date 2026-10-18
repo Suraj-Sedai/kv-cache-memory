@@ -12,9 +12,9 @@ Status:
 Abbreviations:
 - `arch` = `results/arch_sweep/arch_sweep.json`
 - `exp3` = `results/precision_sweep/exp3_precision_sweep.csv` (decode length 60)
-- `exp3-pre` = `results/pre_fix/exp3_precision_sweep_e383030.csv`
+- `exp3-pre` = `results/pre_fix/exp3_precision_sweep_017b63a.csv`
 - `exp1` = `results/cache_comparison/exp1_layout_comparison.csv`
-- `exp1-pre` = `results/pre_fix/exp1_layout_comparison_e383030.csv`
+- `exp1-pre` = `results/pre_fix/exp1_layout_comparison_017b63a.csv`
 - `oom` = `results/oom_frontier/oom_frontier.json` (decode length 8)
 - `ppl` = `results/perplexity_eval/exp3_perplexity.csv`
 - `wddm` = `results/pre_fix/wddm_spill.json`

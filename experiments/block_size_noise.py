@@ -1,7 +1,7 @@
 """Is the block-size throughput spread real on a single commit?
 
 The withdrawn block-size claim rests on one cell (paged, seq 1100, batch 16, block 32)
-measured at 226.6 tok/s (13fbfae) and 495.3 tok/s (e383030). The TPOT fix 0d029d6 sits
+measured at 226.6 tok/s (13fbfae) and 495.3 tok/s (017b63a). The TPOT fix 40f6b89 sits
 between those commits, so they are not the same code. This runs the same cell N times
 back-to-back on the current commit, each run a fresh process of run_block_size_sweep.py,
 and reports the spread.
@@ -24,7 +24,7 @@ from src.provenance import env_block
 
 OUT_DIR = os.path.join("results", "block_size_sweep")
 CELL = dict(block_size=32, seq_len=1100, batch=16)
-HISTORICAL = {"13fbfae": 226.6, "e383030": 495.3}
+HISTORICAL = {"13fbfae": 226.6, "017b63a": 495.3}
 
 
 def main():

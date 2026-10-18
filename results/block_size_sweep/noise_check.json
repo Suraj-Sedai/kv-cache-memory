@@ -32,7 +32,7 @@
   "max_over_min": 1.182,
   "historical": {
     "13fbfae": 226.6,
-    "e383030": 495.3
+    "017b63a": 495.3
   },
   "historical_max_over_min": 2.186,
   "note": "Paper claim: 'Two runs of the same config gave 227 and 495 tok/s'. If max_over_min on one commit is far below the historical ratio, the claim cannot be supported as 'same config' and should be removed."

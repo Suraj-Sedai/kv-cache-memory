@@ -5,7 +5,7 @@
   table 3  INT8 perplexity cost on real GPT-2 weights      <- results/perplexity_eval/exp3_perplexity.csv
   table 4  paged / contiguous throughput range             <- results/cache_comparison/exp1_layout_comparison.csv
   table 5  decode-step FLOPs and arithmetic share of TPOT  <- results/precision_sweep, results/matmul_peak
-  table 6  pre-fix ledger at 2048x16 and across the grid  <- results/pre_fix/exp3_precision_sweep_e383030.csv
+  table 6  pre-fix ledger at 2048x16 and across the grid  <- results/pre_fix/exp3_precision_sweep_017b63a.csv
   table 7  effective ceiling below each enforced budget    <- results/oom_frontier, results/pre_fix/wddm_spill.json
   table 8  withdrawn block-size ranking, cells won         <- results/pre_fix/exp2_*, results/block_size_sweep
   table 9  pitfall-2 batch effect; interleaved vs unpaired <- results/pre_fix/exp1_*, results/paired_layout_check, exp1
@@ -126,13 +126,13 @@ def table5():
 
 
 def table6():
-    """Pre-fix ledger (LM head over all prefill positions), single source exp3 @e383030."""
-    pre = pd.read_csv(os.path.join(R, "pre_fix", "exp3_precision_sweep_e383030.csv"))
+    """Pre-fix ledger (LM head over all prefill positions), single source exp3 @017b63a."""
+    pre = pd.read_csv(os.path.join(R, "pre_fix", "exp3_precision_sweep_017b63a.csv"))
     post = pd.read_csv(os.path.join(R, "precision_sweep", "exp3_precision_sweep.csv"))
     pick = lambda d, s, b: d[(d.cache_type == "paged_fp16") & (d.seq_len == s) & (d.batch == b)].iloc[0]
     a, b = pick(pre, 2048, 16), pick(post, 2048, 16)
     logits_mb = 16 * 2048 * 50257 * 2 / 2 ** 20              # [B, T, vocab] fp16, all positions
-    print("Table 6: LM-head fix at 2048x16, FP16 paged (pre: results/pre_fix/exp3_precision_sweep_e383030.csv)")
+    print("Table 6: LM-head fix at 2048x16, FP16 paged (pre: results/pre_fix/exp3_precision_sweep_017b63a.csv)")
     print(f"  before: cache {a.cache_memory_mb:.1f} / peak {a.peak_memory_mb:.2f} MB = "
           f"{100 * a.cache_memory_mb / a.peak_memory_mb:.1f}%; logits 16*2048*50257*2 B = {logits_mb:.1f} MB "
           f"= {100 * logits_mb / a.peak_memory_mb:.1f}% of peak")
@@ -187,7 +187,7 @@ def table8():
     """Withdrawn block-size ranking: which block size wins each (seq_len, batch) cell."""
     print("Table 8: block size with the highest throughput per (seq_len, batch) cell (withdrawn claim)")
     for name, path in [("13fbfae (the ranking the paper withdraws)", ("pre_fix", "exp2_block_size_sweep_13fbfae.csv")),
-                       ("e383030", ("pre_fix", "exp2_block_size_sweep_e383030.csv")),
+                       ("017b63a", ("pre_fix", "exp2_block_size_sweep_017b63a.csv")),
                        ("current", ("block_size_sweep", "exp2_block_size_sweep.csv"))]:
         d = pd.read_csv(os.path.join(R, *path))
         if "status" in d:
@@ -202,11 +202,11 @@ def table8():
 def table9():
     """Pitfall-2 batch effect vs unpaired-sweep drift, and the interleaved paged/contiguous ratio.
 
-    Batch effect: pre-fix paged tpot_ms at seq 128, batch 16 over batch 1 (exp1 @e383030).
+    Batch effect: pre-fix paged tpot_ms at seq 128, batch 16 over batch 1 (exp1 @017b63a).
     Drift: per cell, exp1's unpaired paged/contiguous throughput ratio vs the interleaved median
     (results/paired_layout_check); the largest disagreement factor is the drift we observed.
     """
-    pre = pd.read_csv(os.path.join(R, "pre_fix", "exp1_layout_comparison_e383030.csv"))
+    pre = pd.read_csv(os.path.join(R, "pre_fix", "exp1_layout_comparison_017b63a.csv"))
     tp = lambda s, b: pre[(pre.cache_type == "paged") & (pre.seq_len == s) & (pre.batch == b)].tpot_ms.iloc[0]
     print("Table 9: pitfall-2 batch effect vs unpaired drift; interleaved paged/contiguous throughput")
     print(f"  pre-fix paged TPOT, seq 128: batch 1 {tp(128, 1):.3f} -> batch 16 {tp(128, 16):.3f} ms "

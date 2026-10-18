@@ -5,7 +5,7 @@
                       <- results/arch_sweep/arch_sweep.json
   fig2_cache_share    KV cache share of peak memory before / after the LM-head fix
                       (FP16, batch 16; logic ported from the old analysis/make_paper_figures.py)
-                      <- results/pre_fix/exp3_precision_sweep_e383030.csv (before)
+                      <- results/pre_fix/exp3_precision_sweep_017b63a.csv (before)
                          results/precision_sweep/exp3_precision_sweep.csv  (after)
   fig3_oom_frontier   FP16 / INT8 status under enforced memory budgets
                       <- results/oom_frontier/oom_frontier.json
@@ -136,9 +136,9 @@ def cache_share(path, batch=16):
 
 
 def figure2():
-    before_p = os.path.join(RESULTS, "pre_fix", "exp3_precision_sweep_e383030.csv")
+    before_p = os.path.join(RESULTS, "pre_fix", "exp3_precision_sweep_017b63a.csv")
     after_p = os.path.join(RESULTS, "precision_sweep", "exp3_precision_sweep.csv")
-    print("\n=== fig2_cache_share <- pre_fix/exp3_precision_sweep_e383030.csv, "
+    print("\n=== fig2_cache_share <- pre_fix/exp3_precision_sweep_017b63a.csv, "
           "precision_sweep/exp3_precision_sweep.csv (paged_fp16, batch 16) ===")
     b, a = cache_share(before_p), cache_share(after_p)
     tbl = pd.DataFrame({"before_status": b.status, "before_cache_mb": b.cache_memory_mb,
@@ -152,7 +152,7 @@ def figure2():
     w = 0.38
     fig, ax = plt.subplots(figsize=(6.2, 3.5))
     ax.bar(x - w / 2, b.share_pct.reindex(seqs).fillna(0), w - 0.03, color=ORANGE,
-           label="before fix: LM head over all prefill positions (e383030)")
+           label="before fix: LM head over all prefill positions (017b63a)")
     ax.bar(x + w / 2, a.share_pct, w - 0.03, color=BLUE, label="after fix: LM head on last position only")
     for xi, s in zip(x, seqs):
         bv, st = b.share_pct.get(s), b.status.get(s)
