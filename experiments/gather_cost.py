@@ -5,7 +5,7 @@ PagedKVCache.read (src/kv_cache/paged.py:69-74) copies a sequence's pages into a
 This measures, per decode step, the time spent inside read() (the gather) and compares it with
 the per-token latency gap between the two layouts:
 
-    share = gather_ms_per_step / (TPOT_paged - TPOT_contiguous)
+    share = median(gather_ms_per_step) / median(TPOT_paged - TPOT_contiguous)   per cell
 
 Per cell, in one process, with one model, weights and prompt, each rep runs in order:
   A  contiguous generation -> TPOT (tpot_p50_ms)
@@ -14,9 +14,11 @@ Per cell, in one process, with one model, weights and prompt, each rep runs in o
      (sum over layers, median over the decode steps), plus that run's own TPOT
 A and B are the same generation path as run_cache_comparison.py (make_cache, run_one). Timing
 is kept off B so the instrumentation does not inflate TPOT_paged. The share uses A and B's TPOTs;
-C's TPOT is reported only to show the instrumentation overhead (tpot_paged_instrumented_ms -
-tpot_paged_ms). A share above 1.0 (gather longer than the whole gap) is flagged per rep and per
-cell: it means the events overstate the gather or the gap is noise-sized.
+C's TPOT is reported only to show the instrumentation overhead, median(tpot_paged_instrumented_ms)
+/ median(tpot_paged_ms). The cell share is a ratio of medians, with the IQRs of gather and gap;
+per-rep shares are kept in the JSON but not summarized. The gap is resolved when its IQR excludes
+0 and is narrower than its median. A share above 1.0 (gather longer than the whole gap) is
+flagged per rep and per cell: it means the events overstate the gather or the gap is noise-sized.
 
 The events bracket the whole read() call on the stream, so the gather time includes the index
 arithmetic (paged.py _index) and any launch gaps between those kernels, not only the copy.
@@ -76,6 +78,28 @@ def gather_per_step(model, mc, prompt):
     return statistics.median(per_step.values()), len(per_step), t
 
 
+def iqr(values):
+    q1, _, q3 = statistics.quantiles(values, n=4, method="inclusive")
+    return [round(q1, 4), round(q3, 4)]
+
+
+def summarize(reps):
+    """Per-cell summary from the per-rep records: medians, IQRs, ratio of medians, overhead ratio."""
+    med = lambda k: round(statistics.median(r[k] for r in reps), 4)
+    gather, gap = med("gather_ms_per_step"), med("gap_ms")
+    gap_iqr = iqr([r["gap_ms"] for r in reps])
+    share = round(gather / gap, 4) if gap > 0 else None
+    return dict(median_tpot_contiguous_ms=med("tpot_contiguous_ms"), median_tpot_paged_ms=med("tpot_paged_ms"),
+                median_tpot_paged_instrumented_ms=med("tpot_paged_instrumented_ms"),
+                instrumentation_overhead_ratio=round(med("tpot_paged_instrumented_ms") / med("tpot_paged_ms"), 4),
+                median_gather_ms_per_step=gather, gather_iqr_ms=iqr([r["gather_ms_per_step"] for r in reps]),
+                median_gap_ms=gap, gap_iqr_ms=gap_iqr,
+                gap_resolved=gap_iqr[0] > 0 and gap_iqr[1] - gap_iqr[0] < gap,
+                gather_share_of_gap=share, share_gt_1=share is not None and share > 1.0,
+                reps_with_nonpositive_gap=sum(r["gather_share_of_gap"] is None for r in reps),
+                reps_with_share_gt_1=sum(r["share_gt_1"] for r in reps))
+
+
 def main():
     cells = lambda s: [tuple(int(v) for v in c.split("x")) for c in s.split(",")]
     ap = argparse.ArgumentParser(description="Paged read() gather time vs the paged-contiguous TPOT gap.")
@@ -113,34 +137,25 @@ def main():
                              share_gt_1=share is not None and share > 1.0))
             print(f"{seq_len}x{batch} rep {rep + 1}: {reps[-1]}"
                   + ("  ** SHARE > 1.0 **" if reps[-1]["share_gt_1"] else ""))
-        shares = [r["gather_share_of_gap"] for r in reps if r["gather_share_of_gap"] is not None]
-        med = lambda k: round(statistics.median(r[k] for r in reps), 4)
-        row = dict(seq_len=seq_len, batch=batch, reps=reps,
-                   median_tpot_contiguous_ms=med("tpot_contiguous_ms"), median_tpot_paged_ms=med("tpot_paged_ms"),
-                   median_tpot_paged_instrumented_ms=med("tpot_paged_instrumented_ms"),
-                   median_instrumentation_overhead_ms=med("instrumentation_overhead_ms"),
-                   median_gap_ms=med("gap_ms"), median_gather_ms_per_step=med("gather_ms_per_step"),
-                   median_gather_share_of_gap=round(statistics.median(shares), 4) if shares else None,
-                   min_share=min(shares) if shares else None, max_share=max(shares) if shares else None,
-                   reps_with_nonpositive_gap=sum(r["gather_share_of_gap"] is None for r in reps),
-                   reps_with_share_gt_1=sum(r["share_gt_1"] for r in reps))
-        row["share_gt_1"] = row["median_gather_share_of_gap"] is not None and row["median_gather_share_of_gap"] > 1.0
+        row = dict(seq_len=seq_len, batch=batch, reps=reps, **summarize(reps))
         rows.append(row)
-        print(f"{seq_len}x{batch}: gather {row['median_gather_ms_per_step']} ms/step, gap "
-              f"{row['median_gap_ms']} ms -> share {row['median_gather_share_of_gap']} "
-              f"(range {row['min_share']}-{row['max_share']}); TPOT paged {row['median_tpot_paged_ms']} ms, "
-              f"instrumented {row['median_tpot_paged_instrumented_ms']} ms"
-              + (f"\n  ** SHARE > 1.0: median {row['median_gather_share_of_gap']}, "
-                 f"{row['reps_with_share_gt_1']}/{len(reps)} reps **" if row["reps_with_share_gt_1"] else "") + "\n")
+        print(f"{seq_len}x{batch}: gather {row['median_gather_ms_per_step']} ms/step (IQR {row['gather_iqr_ms']}), "
+              f"gap {row['median_gap_ms']} ms (IQR {row['gap_iqr_ms']}, "
+              f"{'resolved' if row['gap_resolved'] else 'NOT resolved'}) -> share {row['gather_share_of_gap']}; "
+              f"overhead x{row['instrumentation_overhead_ratio']}"
+              + (f"\n  ** SHARE > 1.0: {row['reps_with_share_gt_1']}/{len(reps)} reps **" if row["reps_with_share_gt_1"] else "") + "\n")
         del model
         torch.cuda.empty_cache()
 
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     with open(args.output, "w") as f:
         json.dump(dict(order="per rep: contiguous TPOT, paged TPOT, paged instrumented",
-                       share="gather_ms_per_step (instrumented run) / (tpot_paged - tpot_contiguous) (uninstrumented runs)",
+                       share="median(gather_ms_per_step) (instrumented runs) / median(tpot_paged - tpot_contiguous) "
+                             "(uninstrumented runs); per-rep gather_share_of_gap kept, not summarized",
+                       overhead="median(tpot_paged_instrumented_ms) / median(tpot_paged_ms)",
+                       resolved="gap IQR excludes 0 and is narrower than the median gap",
                        flag="share_gt_1 marks share > 1.0",
-                       cells_with_share_gt_1=[f"{r['seq_len']}x{r['batch']}" for r in rows if r["reps_with_share_gt_1"]],
+                       cells_with_share_gt_1=[f"{r['seq_len']}x{r['batch']}" for r in rows if r["share_gt_1"]],
                        reps=args.reps, warmup=args.warmup, seed=args.seed, decode_len=DECODE_LEN,
                        cells=rows), f, indent=2)
     print(f"wrote {args.output}")
