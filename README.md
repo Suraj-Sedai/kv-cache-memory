@@ -14,7 +14,7 @@ Where KV cache memory goes during transformer inference, measured on one consume
 | 2048 | 16 | 50.8% | 22.8% |
 | 8192 | 32 | 58.0% | 26.0% |
 
-The INT8 cache is 48.4% smaller in every row. Under a fixed memory budget, 36% more tokens fit (about 303k → 412k at 8 GB). On real GPT-2 weights, perplexity changes by less than 0.01%, but 1.2–1.5% of next-token predictions flip.
+The INT8 cache is 48.4% smaller in every row. Under a fixed memory budget, 36% more tokens fit (about 303k → 413k at 8 GB). On real GPT-2 weights, perplexity changes by less than 0.01%, but 1.2–1.5% of next-token predictions flip.
 
 ## A per-token memory model
 
@@ -42,9 +42,9 @@ None raised an error. Each returned a believable number.
 
 ## What didn't hold up
 
-- **Paged beats contiguous somewhere.** Not in any of 20 cells: paged throughput is 0.32–0.77× contiguous, and peak memory is within 0.9%. This setup can't show paging's benefit, because all sequences are the same length and the page pool is allocated at full size up front.
+- **Paged beats contiguous somewhere.** Not in any of 20 cells, and not in any of 15 interleaved pairs: with the two layouts alternating in one process, paged throughput is 0.58–0.65× contiguous (median per cell), and peak memory is within 0.9%. This setup can't show paging's benefit, because all sequences are the same length and the page pool is allocated at full size up front.
 - **Contiguous fragments less than paged.** Only because of bug 3.
-- **Small block sizes are fastest.** Two runs of the same config gave 227 and 495 tok/s. Too noisy to rank.
+- **Small block sizes are fastest.** After the fixes, no block size leads in more than 5 of 15 cells, and the 1.17× spread between block-size means matches the 1.18× spread between two runs of one cell on the same commit (1457 vs 1232 tok/s). Too noisy to rank.
 
 ## Setup and limits
 

@@ -19,6 +19,7 @@ Printed below (numbered by this script, not the paper):
   table 8  withdrawn block-size ranking, cells won         <- results/pre_fix/exp2_*, results/block_size_sweep
   table 9  pitfall-2 batch effect; interleaved vs unpaired <- results/pre_fix/exp1_*, results/paired_layout_check, exp1
   table 10 paged read() gather vs the paged-contiguous gap <- results/gather_cost/gather_cost.json (5 reps), _r15 (15 reps)
+  table 11 memory-traffic share of TPOT at 672 GB/s        <- results/precision_sweep, exp1
 
 The memory-model numbers (0.08%, 11.00 KB/token, ...) are in scripts/check_memory_model.py.
 
@@ -271,6 +272,30 @@ def table10():
                   + (f"  ** {', '.join(flags)} **" if flags else ""))
 
 
+def table11():
+    """Memory-traffic share of a decode step = bytes read / specified bandwidth / measured TPOT.
+
+    A step reads the FP16 weights (146 MB: parameters x 2 B, paper section 3) and the live cache
+    (cache_memory_mb, its size at the end of decode, so an upper bound). The paged gather adds a
+    write and a re-read of the gathered copy, 3x the cache bytes in all. 672 GB/s is the RTX 5070 Ti
+    Laptop's specified bandwidth (192-bit GDDR7 at 28 Gbps), not a measurement.
+    """
+    weights, bw = 146 * 2 ** 20, 672e9
+    print("Table 11: memory-traffic share of TPOT at 672 GB/s (weights + live cache; paged gather 3x cache)")
+    for name, path in [("precision sweep", os.path.join(R, "precision_sweep", "exp3_precision_sweep.csv")),
+                       ("cache comparison", os.path.join(R, "cache_comparison", "exp1_layout_comparison.csv"))]:
+        d = pd.read_csv(path)
+        d = d[d.status == "ok"]
+        for ct, x in d.groupby("cache_type"):
+            cache = x.cache_memory_mb * 2 ** 20
+            plain = 100 * (weights + cache) / bw * 1e3 / x.tpot_ms
+            line = f"  {name}, {ct}: {plain.min():.2f}-{plain.max():.2f}% of TPOT"
+            if ct.startswith("paged"):
+                gather = 100 * (weights + 3 * cache) / bw * 1e3 / x.tpot_ms
+                line += f"; with the gather copy {gather.min():.2f}-{gather.max():.2f}%"
+            print(line)
+
+
 def table4():
     d = pd.read_csv(os.path.join(R, "cache_comparison", "exp1_layout_comparison.csv"))
     d = d[d.status == "ok"]
@@ -457,6 +482,8 @@ if __name__ == "__main__":
     table9()
     print()
     table10()
+    print()
+    table11()
     print()
     failed = check_reported()
     print()

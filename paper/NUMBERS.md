@@ -27,11 +27,14 @@ The memory model uses the integer activation coefficients, 3·d_model + 2·d_ff:
 live at the peak, counted in `census`. The general form is max(7·d_model, 3·d_model + 2·d_ff);
 every tested shape has d_ff ≥ 2·d_model.
 
-## Untraced: 0
+## Untraced: 0. Does not reproduce: 1
 
 Every printed number traces to a committed file. The last two were closed by the GPU runs at
 f8aa452: `results/matmul_peak/matmul_peak.json` (decode arithmetic 0.03–0.65%) and
 `results/sdpa_backend_check/sdpa_backend_check.json` (32 MB vs 4,888 MB).
+
+One number in the PDF does not reproduce: Section 2's memory-traffic share, "3–15%" (see
+[PDF of 2026-10-20](#pdf-of-2026-10-20-measuring_the_wrong_ledgerpdf)).
 
 ## Abstract and Introduction (lines 11–29)
 
@@ -146,6 +149,33 @@ f8aa452: `results/matmul_peak/matmul_peak.json` (decode arithmetic 0.03–0.65%)
 | 183 | 2.7% or 26% | `exp3` | | ok |
 | 185 | "roughly 1.2 times model memory" | [2] | | external |
 | 185 | 11.01, 11.00, 11.04 KB at 4/8/16 layers; 0.08% | `arch` | | ok; CMM |
+
+## PDF of 2026-10-20 (`Measuring_the_Wrong_Ledger.pdf`)
+
+Numbers the PDF prints that `paper.md` (2026-10-15) does not, or prints differently. Keyed by
+section, since the PDF has no line numbers. Every other number in the PDF matches a row above.
+`T11` = `scripts/make_tables.py` Table 11.
+
+| Section | Number | Source | Key / row / column | Status |
+|---|---|---|---|---|
+| 2 Scope | 146 MB of weights; 672 GB/s | derived; external | as line 57; RTX 5070 Ti Laptop specification (192-bit GDDR7, 28 Gbps) | derived; external |
+| 2 Scope | memory traffic **3–15%** of per-token latency, "across the precision sweep and the cache-comparison grid" | `exp3`, `exp1` | (146 MB + `cache_memory_mb`) / 672 GB/s / `tpot_ms`: `exp3` FP16 2.81–11.58%, INT8 1.45–3.83%; `exp1` contiguous 5.13–15.22%, paged 2.18–9.54% | **does not reproduce**: 2.2–15% over FP16 cells, 1.5–15% over all cells. The upper bound holds; the lower bound is 3% only for `exp3` FP16 and `exp1` contiguous. Suggested text: "at most 15%"; T11 |
+| 2 Scope | at most a third, counting the gather copy | `exp3`, `exp1` | paged cells, weights + 3 × cache: max 32.95% (`exp3` FP16 4096×32) | ok; T11 |
+| 2 Decode length | 24 of the 26 MB between 7113 and 7086.5 MB | `exp3` / `oom` | 4128.0 − 4104.0 = 24; 7112.57 − 7086.5 = 26.07 | ok |
+| 3 | 7086.5 / 7090.6 MB | `oom` | `fp16.peak_mb` 8192×32, 16384×16 | ok |
+| 3 | 524,288 tokens: 14,008.6 and 14,008.7 MB | `wddm` | FP16 8192×64, 16384×32 `peak_allocated_mb` | ok |
+| 3 | census within 0.14 MB at 8192 tokens | `census` | max \|`forward_peak_mb` − `predicted_mb`\| = 0.14 (8L/1024d/2048ff); `mb_at_gelu` within 0.01 | ok |
+| 3 | attention phase 7·d_model | `census` | `attn_read_d_model_tensors` 7 in all six shapes | ok |
+| 3, Table 1 | every cell | `arch` | identical to `paper/tables/table1.tex` | ok; CMM, T1 tex |
+| 3 | peaks between 1.5 and 4.5 GB | `arch` | baseline `peaks` 1496.8–4520.1 MB = 1.46–4.41 GB (GB = 2^30) | ok to one decimal at the low end; 4.4 GB at the high end |
+| 4 | after the fix, paged decode 8.9–11.2 ms per token, no trend | `exp1` | paged `tpot_ms` 8.906 (256×1) – 11.209 (128×4), 20 cells | ok |
+| 5.2 | 0.51562 in every cell at batch ≥ 16; smaller cells 0.51556–0.51588 | `exp3` | int8/fp16 `cache_memory_mb` per cell | ok |
+| 5.2 | 10,328.9 / 10,332.8 MB INT8 | `oom`, `wddm` | `int8.peak_mb` 8192×64, 16384×32 | ok |
+| 5.5 | 100-token continuation matches 23% / 31% if flips were independent | `ppl` | 0.9854^100 = 0.230; 0.9883^100 = 0.308 | derived |
+| 6 | no block size leads in more than 5 of 15 cells; block 8 slowest on average; 1.17× spread of means | `results/block_size_sweep/exp2_block_size_sweep.csv` | cells won {8: 2, 16: 4, 32: 4, 64: 5}; means 1276.3 / 1431.5 / 1497.5 / 1488.4 tok/s; 1497.5 / 1276.3 = 1.173 | ok; T8 |
+| 6 | 1.2–1.8× (blocks 8, 16 over 32, 64, before the fixes) | `results/pre_fix/exp2_block_size_sweep_13fbfae.csv` | 314.4 / 258.3 = 1.22; 326.6 / 181.1 = 1.80 | ok; T8 |
+| 6 | fragmentation rises with block size in all 15 cells; latency higher at block 8 than 64 in 13 | `results/block_size_sweep/exp2_block_size_sweep.csv` | `frag_ratio` non-decreasing in block size and higher at 64 than at 8 in 15/15 (ties between neighbours in some cells); `tpot_ms` 8 > 64 in 13/15 | ok |
+| 7 | 0.90 of 1.37 ms; 1.21 of 2.74 ms; a third to over half outside; 0.89–1.15× | `gather` | as line 161 (draft) | ok; T10 |
 
 ## Figure captions (draft, not yet in paper.md)
 
