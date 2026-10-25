@@ -143,6 +143,8 @@ Use `--help` on any runner to select a subset of the grid (for example `--seq-le
 }
 ```
 
+Code and data (all versions): [![DOI](https://zenodo.org/badge/1433262584.svg)](https://doi.org/10.5281/zenodo.23643489)
+
 ## License
 
 Code: MIT. Paper: CC BY 4.0.
