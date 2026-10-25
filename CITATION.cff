@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite it as below."
+title: "kv-cache-memory: code and data for 'Measuring the Wrong Ledger'"
+authors:
+  - family-names: Sedai
+    given-names: Suraj
+    affiliation: Mercy University
+version: 1.0.0
+date-released: 2026-10-25
+license: MIT
+repository-code: "https://github.com/Suraj-Sedai/kv-cache-memory"
+keywords: [KV cache, memory model, LLM inference, quantization]

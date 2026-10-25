@@ -1,6 +1,16 @@
-# Measuring the Wrong Ledger
+# Measuring the Wrong Ledger: Pitfalls and a Memory Model for KV Cache Studies
 
-Where KV cache memory goes during transformer inference, measured on one consumer GPU, and four measurement bugs that each gave me a confident wrong answer first.
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23642747.svg)](https://doi.org/10.5281/zenodo.23642747)
+
+**Suraj Sedai**, Mercy University · [Paper (PDF)](paper/Measuring_the_Wrong_Ledger.pdf) · [Zenodo](https://doi.org/10.5281/zenodo.23642747)
+
+Regenerate every figure and table from the committed results:
+
+```
+pip install -r requirements.txt && python scripts/make_figures.py && python scripts/make_tables.py
+```
+
+Where KV cache memory goes during transformer inference, measured on one consumer GPU, and four measurement bugs, each of which gave me a confident conclusion that turned out wrong or unsupported.
 
 
 **Main point:** a memory optimization only pays off when the thing it shrinks is a large share of memory. INT8 halves the KV cache in every workload here, but that cuts peak memory by anywhere from 2.7% to 26%. The technique doesn't change. The cache's share of memory does.
@@ -29,14 +39,14 @@ The cache is kept for every layer. Activations are not: each layer's temporaries
 
 Built from five model shapes, the formula predicts GPT-2 small, a shape it never saw, at 53.06 KB/token. Measured: 53.08 (0.03% off). Worst error across all six shapes: 0.08%.
 
-## Four bugs, four wrong conclusions
+## Four bugs, four unsupported conclusions
 
 None raised an error. Each returned a believable number.
 
-| Bug | What I wrongly concluded | How to spot it in your own setup |
+| Bug | What I concluded | How to spot it in your own setup |
 |---|---|---|
 | LM head ran on every prefill position, not just the last | KV cache is at most 14% of peak, so INT8 can't help | Measured peak is bigger than your hand-computed sum of tensors |
-| Attention looped over the batch in Python | Decode is launch-bound on this GPU | Per-token latency grows with batch but stays flat across seq_len: cost scales with Python loop iterations, not attention work. Before the fix, paged TPOT at seq 128 went 4.92 → 23.23 ms from batch 1 to 16, and at batch 1 went 4.92 → 5.09 ms from seq 128 to 2048 |
+| Attention looped over the batch in Python | Decode is launch-bound on this GPU (right, but this measurement couldn't show it) | Per-token latency grows with batch but stays flat across seq_len: cost scales with Python loop iterations, not attention work. Before the fix, paged TPOT at seq 128 went 4.92 → 23.23 ms from batch 1 to 16, and at batch 1 went 4.92 → 5.09 ms from seq 128 to 2048 |
 | Contiguous cache reserved exactly the final length | Contiguous never fragments | Fragmentation is exactly 0 in every cell |
 | Windows driver spilled to host RAM instead of failing | This GPU never runs out of memory | 14,009 MB "allocated" on an 11.9 GB card |
 
@@ -119,3 +129,20 @@ Use `--help` on any runner to select a subset of the grid (for example `--seq-le
 - **Peak memory is `torch.cuda.max_memory_allocated`.** It does not include allocator fragmentation or reserved-but-unused memory.
 - **Rerun tolerance.** memory values reproduce to within 1 MB across environments; observed differences are allocator granularity. Rerunning committed cells on this machine (October 2026) reproduced `cache_memory_mb` exactly and `peak_memory_mb` exactly on most cells; the largest difference was INT8 512×1, 168.31 vs 167.31 MB committed. The unmodified original code gives the same new values. Perplexity rows reproduce exactly.
 - **Timing columns are not comparable across runs.** Clocks are not locked and cells run in a fixed order. No latency claims are made.
+
+## Citation
+
+```bibtex
+@misc{sedai2026ledger,
+  author    = {Sedai, Suraj},
+  title     = {Measuring the Wrong Ledger: Pitfalls and a Memory Model for KV Cache Studies},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.23642747},
+  note      = {Preprint}
+}
+```
+
+## License
+
+Code: MIT. Paper: CC BY 4.0.
